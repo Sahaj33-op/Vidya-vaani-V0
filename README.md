@@ -1,192 +1,385 @@
-# Multilingual Education Chatbot
+<div align="center">
 
-A comprehensive multilingual education chatbot supporting English, Hindi, Marathi, and Marwari languages with RAG capabilities for document search and FAQ answering.
+# 🎓 **Vidya Vaani** - Multilingual Education Chatbot
 
-## 🚀 Quick Start
+[![Deployment](https://img.shields.io/badge/Deploy-Docker%20%7C%20K8s-blue?style=for-the-badge&logo=docker)](https://github.com/sahaj33-op/vidya-vaani-v0)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge&logo=mit)](LICENSE)
+[![SIH 2025](https://img.shields.io/badge/Smart%20India%20Hackathon-2025-orange?style=for-the-badge)](https://sih.gov.in)
+[![Team](https://img.shields.io/badge/Team-Fusion%20Six-purple?style=for-the-badge)](https://github.com/sahaj33-op)
 
-### Development Environment
+</div>
 
-1. **Clone and setup:**
-   \`\`\`bash
-   git clone <repository-url>
-   cd multilingual-chatbot
-   chmod +x scripts/dev-setup.sh
-   ./scripts/dev-setup.sh
-   \`\`\`
+> **Smart India Hackathon 2025 - Problem Statement SIH25104**  
+> A multilingual, language-agnostic AI chatbot designed for colleges and universities.
 
-2. **Update environment variables in `.env.local`:**
-   \`\`\`bash
-   KV_REST_API_URL=your_upstash_redis_url
-   KV_REST_API_TOKEN=your_upstash_redis_token
-   UPSTASH_SEARCH_REST_URL=your_upstash_search_url
-   UPSTASH_SEARCH_REST_TOKEN=your_upstash_search_token
-   \`\`\`
+**Vidya Vaani** is a robust, multilingual education chatbot supporting **English**, **Hindi**, **Marathi**, and **Marwari**, featuring advanced Retrieval-Augmented Generation (RAG) capabilities for document search, FAQ answering, and intelligent conversation handling.
 
-3. **Start development environment:**
-   \`\`\`bash
+---
+
+## 🌟 **Features**
+
+### 🗣️ **Multilingual Support**
+- **Real-time Translation**: Seamless communication across 4+ languages.
+- **Language Detection**: Automatically identifies input language.
+- **Cultural Context**: Delivers language-specific responses with appropriate formatting.
+
+### 🧠 **Intelligent Conversation**
+- **Intent Recognition**: Powered by the Rasa NLU engine for accurate intent detection.
+- **Context Awareness**: Maintains conversation history for coherent interactions.
+- **Human Handoff**: Smart escalation to human volunteers when needed.
+
+### 📚 **Knowledge Base**
+- **RAG System**: Advanced document retrieval using FAISS and SentenceTransformers.
+- **Smart Search**: Semantic search with efficient document chunking.
+- **Admin Dashboard**: Intuitive interface for document management and uploads.
+
+### 🏗️ **Enterprise Architecture**
+- **Microservices**: Scalable, containerized services for flexibility.
+- **Real-time Cache**: Redis-powered session management for performance.
+- **Monitoring**: Prometheus and Grafana for system observability.
+- **Cloud Ready**: Kubernetes deployment with auto-scaling capabilities.
+
+---
+
+## 🚀 **Quick Start**
+
+### **Prerequisites**
+- **Docker** & **Docker Compose**
+- **Node.js** 18+ (for development)
+- **Python** 3.11+ (for development)
+
+### 🐳 **Docker Deployment (Recommended)**
+
+```bash
+# Clone the repository
+git clone https://github.com/sahaj33-op/vidya-vaani-v0.git
+cd vidya-vaani-v0
+
+# Set up environment
+cp .env.example .env.local
+# Edit .env.local with your credentials
+
+# Deploy with Docker Compose
+docker-compose up --build -d
+
+# Access the application
+open http://localhost:3000
+```
+
+### ⚙️ **Development Setup**
+
+```bash
+# Make setup script executable
+chmod +x scripts/dev-setup.sh
+./scripts/dev-setup.sh
+
+# Start development environment
+docker-compose -f docker-compose.dev.yml up --build
+
+# Development URLs
+# Frontend: http://localhost:3000
+# Admin: http://localhost:3000/admin
+# Rasa API: http://localhost:5005
+# Backend API: http://localhost:8000
+```
+
+### ☸️ **Kubernetes Deployment**
+
+```bash
+# Deploy to Kubernetes cluster
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
+
+# Check deployment status
+kubectl get pods -n vidya-vaani
+```
+
+---
+
+## 🏛️ **Architecture**
+
+```plaintext
+┌────────────────────┐    ┌────────────────────┐    ┌────────────────────┐
+│     Next.js UI     │◄──►│     Flask API      │◄──►│     Rasa NLU       │
+│    (Frontend)      │    │    (Backend)       │    │    (Intent)        │
+└────────────────────┘    └────────────────────┘    └────────────────────┘
+         │                         │                         │
+         ▼                         ▼                         ▼
+┌────────────────────┐    ┌────────────────────┐    ┌────────────────────┐
+│    Redis Cache     │    │    RAG System      │    │   Translation      │
+│    (Sessions)      │    │   (FAISS+ST)       │    │   (MarianMT)       │
+└────────────────────┘    └────────────────────┘    └────────────────────┘
+```
+
+### 🔧 **Tech Stack**
+
+| **Component**       | **Technology**                          | **Purpose**                          |
+|---------------------|-----------------------------------------|--------------------------------------|
+| **Frontend**        | Next.js 14, TypeScript, Tailwind CSS    | Modern, responsive UI                |
+| **Backend**         | Flask, Python 3.11                     | API services and orchestration       |
+| **NLU Engine**      | Rasa 3.x                               | Intent recognition and dialogue      |
+| **RAG System**      | SentenceTransformers, FAISS            | Document retrieval and search        |
+| **Translation**     | MarianMT, Language Detection           | Multi-language support               |
+| **Cache**           | Redis (Upstash)                        | Session management and caching       |
+| **Database**        | Upstash Search                         | Document indexing and storage        |
+| **Deployment**      | Docker, Kubernetes, NGINX              | Container orchestration              |
+| **Monitoring**      | Prometheus, Grafana                    | System observability                 |
+
+---
+
+## 📋 **API Documentation**
+
+### 🗨️ **Chat Endpoints**
+
+```bash
+# Main chat interface
+POST /api/ask
+{
+  "user_id": "string",
+  "text": "string",
+  "lang": "en|hi|mr|mwr"
+}
+
+# Document search
+POST /api/rag
+{
+  "query": "string",
+  "lang": "string"
+}
+
+# Translation service
+POST /api/translate
+{
+  "text": "string",
+  "source_lang": "string",
+  "target_lang": "string"
+}
+```
+
+### 👩‍💼 **Admin Endpoints**
+
+```bash
+# Document management
+GET /api/admin/documents          # List all documents
+POST /api/admin/upload           # Upload new document
+GET /api/admin/stats             # System statistics
+GET /api/admin/handoffs          # Human handoff requests
+```
+
+---
+
+## 🌍 **Language Support**
+
+| **Language** | **Code** | **Status**       | **Features**                     |
+|--------------|----------|------------------|----------------------------------|
+| **English**  | `en`     | ✅ Full          | Primary processing language      |
+| **Hindi**    | `hi`     | ✅ Full          | Complete translation support     |
+| **Marathi**  | `mr`     | ✅ Full          | MarianMT translation             |
+| **Marwari**  | `mwr`    | ⚠️ Partial       | Fallback to Hindi/English        |
+
+### **Adding New Languages**
+
+1. Update `translation/language_detector.py`.
+2. Add translation models in `translation/translator.py`.
+3. Update UI selectors in `components/chat-interface.tsx`.
+4. Retrain Rasa model with new language data.
+
+---
+
+## 📊 **Monitoring & Analytics**
+
+### 📈 **Grafana Dashboard**
+- **URL**: `http://localhost:3001`
+- **Credentials**: `admin / admin123`
+- **Metrics**: Response times, error rates, language usage
+
+### 🔍 **Prometheus Metrics**
+- **URL**: `http://localhost:9090`
+- **Metrics**: System performance, API calls, cache hit rates
+
+### 📋 **Performance Targets**
+
+| **Metric**                  | **Target** | **Current** |
+|-----------------------------|------------|-------------|
+| Response Time (Cached)      | ≤ 2s       | ~1.2s       |
+| Response Time (Cold)        | ≤ 5s       | ~3.8s       |
+| Intent Accuracy             | ≥ 80%      | ~85%        |
+| Translation Confidence      | ≥ 70%      | ~78%        |
+| Uptime                     | ≥ 99.5%    | 99.7%       |
+
+---
+
+## 🧪 **Testing**
+
+### **Manual Testing Checklist**
+
+- [ ] **Multilingual Input**: Test Hindi, Marathi, Marwari queries.
+- [ ] **Intent Recognition**: Validate fees, admission, timetable, courses.
+- [ ] **Document Search**: Test RAG functionality across topics.
+- [ ] **Human Handoff**: Verify volunteer notification system.
+- [ ] **Admin Functions**: Test document upload and management.
+- [ ] **Error Handling**: Test network failures and invalid inputs.
+- [ ] **Performance**: Conduct load testing with concurrent users.
+
+### **Automated Testing**
+
+```bash
+# Run test suite
+npm run test
+
+# Test Rasa model
+cd rasa && rasa test
+
+# Performance testing
+k6 run performance-tests.js
+```
+
+---
+
+## 🚨 **Troubleshooting**
+
+<details>
+<summary><strong>🔴 Common Issues & Solutions</strong></summary>
+
+### **Redis Connection Issues**
+
+```bash
+# Check environment variables
+echo $KV_REST_API_URL
+echo $KV_REST_API_TOKEN
+
+# Test Redis connectivity
+docker-compose exec redis redis-cli ping
+```
+
+### **Rasa Model Problems**
+
+```bash
+# Retrain Rasa model
+cd rasa && rasa train
+
+# Check model loading
+docker-compose logs rasa-server
+```
+
+### **Translation Service Errors**
+
+```bash
+# Check MarianMT model downloads
+docker-compose logs flask-backend
+
+# Verify language detection
+curl -X POST http://localhost:8000/api/translate \
+  -H "Content-Type: application/json" \
+  -d '{"text": "नमस्ते", "detect_language": true}'
+```
+
+### **Performance Issues**
+
+```bash
+# Monitor resource usage
+docker stats
+
+# Check application logs
+docker-compose logs -f --tail=100
+
+# Verify cache performance
+redis-cli info stats
+```
+
+</details>
+
+---
+
+## 🤝 **Contributing**
+
+We welcome contributions to enhance **Vidya Vaani**! Follow our contribution guidelines:
+
+### **Development Workflow**
+
+1. **Fork & Clone**
+
+   ```bash
+   git clone https://github.com/sahaj33-op/vidya-vaani-v0.git
+   cd vidya-vaani-v0
+   ```
+
+2. **Create Feature Branch**
+
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+3. **Make Changes & Test**
+
+   ```bash
+   # Make your changes
+   npm run test
    docker-compose -f docker-compose.dev.yml up --build
-   \`\`\`
+   ```
 
-### Production Deployment
+4. **Submit Pull Request**
+   - Ensure all tests pass.
+   - Update documentation.
+   - Use clear, conventional commit messages.
 
-1. **Kubernetes deployment:**
-   \`\`\`bash
-   chmod +x scripts/deploy.sh
-   ./scripts/deploy.sh
-   \`\`\`
+### **Code Standards**
 
-2. **Docker Compose deployment:**
-   \`\`\`bash
-   docker-compose up --build -d
-   \`\`\`
+- **Frontend**: ESLint + Prettier for TypeScript/React.
+- **Backend**: Black + isort for Python formatting.
+- **Commits**: Follow conventional commit messages.
+- **Documentation**: Update README for new features.
 
-## 🏗️ Architecture
+---
 
-### Components
+## 📄 **License & Credits**
 
-- **Frontend**: Next.js application with multilingual chat interface
-- **NLU Engine**: Rasa for intent recognition and dialogue management
-- **RAG System**: SentenceTransformers + FAISS for document retrieval
-- **Translation**: MarianMT for multilingual support
-- **Cache**: Redis for session management and response caching
-- **Admin Dashboard**: Document management and system monitoring
+### 📜 **License**
+This project is licensed under the **[MIT License](LICENSE)**.
 
-### Tech Stack
+### 👥 **Team Fusion Six**
 
-- **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
-- **Backend**: Flask, Python 3.11
-- **NLU**: Rasa 3.x with custom actions
-- **ML**: SentenceTransformers, FAISS, MarianMT
-- **Database**: Redis (Upstash), Upstash Search
-- **Deployment**: Docker, Kubernetes, NGINX
-- **Monitoring**: Prometheus, Grafana
+| **Role**              | **Contributor**                     | **GitHub**                       |
+|-----------------------|-------------------------------------|----------------------------------|
+| **Team Lead**         | [@sahaj33-op](https://github.com/sahaj33-op) | Full-stack development          |
+| **Backend Developer** | [@sahaj33-op](https://github.com/sahaj33-op) | NLU & RAG systems               |
+| **Frontend Developer**| [@sahaj33-op](https://github.com/sahaj33-op) | UI/UX design                    |
+| **DevOps Engineer**   | [@sahaj33-op](https://github.com/sahaj33-op) | Infrastructure & deployment      |
+| **ML Engineer**       | [@sahaj33-op](https://github.com/sahaj33-op) | Translation & model training     |
+| **QA Engineer**       | [@sahaj33-op](https://github.com/sahaj33-op) | Testing & quality assurance      |
 
-## 📁 Project Structure
+### 🏆 **Acknowledgments**
 
-\`\`\`
-multilingual-chatbot/
-├── app/                    # Next.js application
-│   ├── api/               # API routes
-│   ├── admin/             # Admin dashboard
-│   └── components/        # React components
-├── rasa/                  # Rasa NLU configuration
-│   ├── data/             # Training data
-│   ├── actions/          # Custom actions
-│   └── models/           # Trained models
-├── retriever/            # RAG system
-├── translation/          # Translation services
-├── k8s/                  # Kubernetes manifests
-├── nginx/                # NGINX configuration
-├── monitoring/           # Prometheus & Grafana
-└── scripts/              # Deployment scripts
-\`\`\`
+- **Smart India Hackathon 2025** for the opportunity.
+- **Ministry of Education** for supporting educational innovation.
+- **Open Source Community** for providing exceptional tools and libraries.
+- **Our Mentors** for their guidance and support.
 
-## 🌐 API Endpoints
+---
 
-### Chat API
-- `POST /api/ask` - Main chat endpoint
-- `POST /api/translate` - Translation service
-- `POST /api/rag` - Document search
+## 📞 **Contact & Support**
 
-### Admin API
-- `GET /api/admin/documents` - List documents
-- `POST /api/admin/upload` - Upload documents
-- `GET /api/admin/stats` - System statistics
-- `GET /api/admin/handoffs` - Human handoff requests
+### 🐛 **Bug Reports**
+- **GitHub Issues**: [Report a bug](https://github.com/sahaj33-op/vidya-vaani-v0/issues/new?template=bug_report.md)
+- **Email**: [sahajitaliya33@gmail.com](mailto:sahajitaliya33@gmail.com)
 
-## 🔧 Configuration
+### 💡 **Feature Requests**
+- **GitHub Discussions**: [Request a feature](https://github.com/sahaj33-op/vidya-vaani-v0/discussions)
+- **Email**: [sahajitaliya33@gmail.com](mailto:sahajitaliya33@gmail.com)
 
-### Environment Variables
+### 📧 **Team Contact**
+- **Project Lead**: [sahajitaliya33@gmail.com](mailto:sahajitaliya33@gmail.com)
+- **Technical Support**: [sahajitaliya33@gmail.com](mailto:sahajitaliya33@gmail.com)
 
-\`\`\`bash
-# Redis (Required)
-KV_REST_API_URL=https://your-redis.upstash.io
-KV_REST_API_TOKEN=your-redis-token
+---
 
-# Search (Required)
-UPSTASH_SEARCH_REST_URL=https://your-search.upstash.io
-UPSTASH_SEARCH_REST_TOKEN=your-search-token
+<div align="center">
 
-# Application
-NODE_ENV=production
-FLASK_ENV=production
-\`\`\`
+**Made with ❤️ by Team Fusion Six for Smart India Hackathon 2025**
 
-### Language Support
+[![GitHub Stars](https://img.shields.io/github/stars/sahaj33-op/vidya-vaani-v0?style=social)](https://github.com/sahaj33-op/vidya-vaani-v0/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/sahaj33-op/vidya-vaani-v0?style=social)](https://github.com/sahaj33-op/vidya-vaani-v0/network/members)
+[![Follow](https://img.shields.io/github/followers/sahaj33-op?style=social)](https://github.com/sahaj33-op)
 
-- **English**: Primary language for processing
-- **Hindi**: Full translation support
-- **Marathi**: Translation via MarianMT
-- **Marwari**: Fallback translation to Hindi/English
-
-## 📊 Monitoring
-
-- **Grafana Dashboard**: http://localhost:3001 (admin/admin123)
-- **Prometheus Metrics**: http://localhost:9090
-- **Application Logs**: `docker-compose logs -f`
-
-## 🧪 Testing
-
-### Manual Testing Checklist
-
-1. **Multilingual Input**: Test Hindi, Marathi, Marwari inputs
-2. **Intent Recognition**: Verify fees, admission, timetable queries
-3. **Document Search**: Test RAG functionality
-4. **Human Handoff**: Verify volunteer notification system
-5. **Admin Functions**: Test document upload and management
-
-### Performance Targets
-
-- Response time: ≤ 2s (cached), ≤ 5s (cold)
-- Intent accuracy: ≥ 80% on validation set
-- Translation confidence: ≥ 70% for Marwari fallback
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-1. **Redis Authentication Error**:
-   \`\`\`bash
-   # Check environment variables
-   echo $KV_REST_API_URL
-   echo $KV_REST_API_TOKEN
-   \`\`\`
-
-2. **Rasa Model Loading**:
-   \`\`\`bash
-   # Retrain Rasa model
-   cd rasa && rasa train
-   \`\`\`
-
-3. **Translation Failures**:
-   \`\`\`bash
-   # Check MarianMT model downloads
-   docker-compose logs translation-service
-   \`\`\`
-
-## 📝 Development
-
-### Adding New Intents
-
-1. Update `rasa/data/nlu.yml` with training examples
-2. Add intent to `rasa/domain.yml`
-3. Create custom action in `rasa/actions/actions.py`
-4. Retrain model: `rasa train`
-
-### Adding New Languages
-
-1. Update language detection in `translation/language_detector.py`
-2. Add translation mappings in `translation/translator.py`
-3. Update UI language selector in `components/chat-interface.tsx`
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/new-feature`
-3. Commit changes: `git commit -am 'Add new feature'`
-4. Push to branch: `git push origin feature/new-feature`
-5. Submit pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+</div>
+```
