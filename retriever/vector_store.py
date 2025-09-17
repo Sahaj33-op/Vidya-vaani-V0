@@ -7,10 +7,37 @@ import os
 import json
 import pickle
 import numpy as np
-from typing import List, Dict, Any, Optional, Tuple
+import time
+import platform
+from typing import List, Dict, Any, Optional, Tuple, Union
 import faiss
 from pathlib import Path
 import logging
+import shutil
+import tempfile
+import uuid
+
+# Cross-platform file locking
+if platform.system() == 'Windows':
+    import msvcrt
+    
+    def lock_file(file_handle):
+        """Lock a file on Windows"""
+        msvcrt.locking(file_handle.fileno(), msvcrt.LK_LOCK, 1)
+    
+    def unlock_file(file_handle):
+        """Unlock a file on Windows"""
+        msvcrt.locking(file_handle.fileno(), msvcrt.LK_UNLCK, 1)
+else:
+    import fcntl
+    
+    def lock_file(file_handle):
+        """Lock a file on Unix/Linux"""
+        fcntl.flock(file_handle, fcntl.LOCK_EX)
+    
+    def unlock_file(file_handle):
+        """Unlock a file on Unix/Linux"""
+        fcntl.flock(file_handle, fcntl.LOCK_UN)
 
 from .embeddings import EmbeddingService
 from .document_processor import DocumentChunk
@@ -135,50 +162,92 @@ class FAISSVectorStore:
         }
     
     def _save_index(self) -> None:
-        """Save FAISS index and metadata to disk"""
+        """Save FAISS index and metadata to disk with atomic operations and file locking"""
+        if self.index is None:
+            return
+            
+        # Create lock file
+        lock_file_path = self.index_path / "index.lock"
+        
         try:
-            if self.index is not None:
-                # Save FAISS index
-                index_file = self.index_path / "faiss.index"
-                faiss.write_index(self.index, str(index_file))
+            # Acquire lock
+            with open(lock_file_path, 'w+') as lock_f:
+                lock_file(lock_f)
                 
-                # Save chunks and metadata
-                chunks_file = self.index_path / "chunks.pkl"
-                with open(chunks_file, 'wb') as f:
-                    pickle.dump(self.chunks, f)
-                
-                metadata_file = self.index_path / "metadata.json"
-                with open(metadata_file, 'w') as f:
-                    json.dump(self.chunk_metadata, f, indent=2)
-                
-                logger.info(f"Saved index to {self.index_path}")
+                try:
+                    # Create temporary directory for atomic save
+                    temp_dir = Path(tempfile.mkdtemp(dir=self.index_path))
+                    
+                    # Save FAISS index to temp location
+                    temp_index_file = temp_dir / "faiss.index"
+                    faiss.write_index(self.index, str(temp_index_file))
+                    
+                    # Save chunks and metadata to temp location
+                    temp_chunks_file = temp_dir / "chunks.pkl"
+                    with open(temp_chunks_file, 'wb') as f:
+                        pickle.dump(self.chunks, f)
+                    
+                    temp_metadata_file = temp_dir / "metadata.json"
+                    with open(temp_metadata_file, 'w') as f:
+                        json.dump(self.chunk_metadata, f, indent=2)
+                    
+                    # Atomically move files to final location
+                    index_file = self.index_path / "faiss.index"
+                    chunks_file = self.index_path / "chunks.pkl"
+                    metadata_file = self.index_path / "metadata.json"
+                    
+                    # Move with atomic replace
+                    shutil.move(str(temp_index_file), str(index_file))
+                    shutil.move(str(temp_chunks_file), str(chunks_file))
+                    shutil.move(str(temp_metadata_file), str(metadata_file))
+                    
+                    logger.info(f"Saved index to {self.index_path}")
+                    
+                finally:
+                    # Clean up temp directory if it exists
+                    if 'temp_dir' in locals() and temp_dir.exists():
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                    
+                    # Release lock
+                    unlock_file(lock_f)
+                    
         except Exception as e:
             logger.error(f"Failed to save index: {e}")
     
     def _load_index(self) -> None:
-        """Load FAISS index and metadata from disk"""
-        try:
-            index_file = self.index_path / "faiss.index"
-            chunks_file = self.index_path / "chunks.pkl"
-            metadata_file = self.index_path / "metadata.json"
+        """Load FAISS index and metadata from disk with file locking"""
+        index_file = self.index_path / "faiss.index"
+        chunks_file = self.index_path / "chunks.pkl"
+        metadata_file = self.index_path / "metadata.json"
+        lock_file_path = self.index_path / "index.lock"
+        
+        if not all(f.exists() for f in [index_file, chunks_file, metadata_file]):
+            logger.info(f"No existing index found at {self.index_path}")
+            return
             
-            if all(f.exists() for f in [index_file, chunks_file, metadata_file]):
-                # Load FAISS index
-                self.index = faiss.read_index(str(index_file))
+        try:
+            # Acquire lock for reading
+            with open(lock_file_path, 'w+') as lock_f:
+                lock_file(lock_f)
                 
-                # Load chunks
-                with open(chunks_file, 'rb') as f:
-                    self.chunks = pickle.load(f)
-                
-                # Load metadata
+                try:
+                    # Load FAISS index
+                    self.index = faiss.read_index(str(index_file))
+                    
+                    # Load chunks
+                    with open(chunks_file, 'rb') as f:
+                        self.chunks = pickle.load(f)
+                    
+                    # Load metadata
                 with open(metadata_file, 'r') as f:
                     self.chunk_metadata = json.load(f)
                     # Convert string keys back to int
                     self.chunk_metadata = {int(k): v for k, v in self.chunk_metadata.items()}
                 
                 logger.info(f"Loaded index from {self.index_path} with {len(self.chunks)} chunks")
-            else:
-                logger.info("No existing index found, will create new one")
+                finally:
+                    # Release lock
+                    unlock_file(lock_f)
         except Exception as e:
             logger.error(f"Failed to load index: {e}")
             self.index = None

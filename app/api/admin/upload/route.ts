@@ -1,10 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { Redis } from "@upstash/redis"
+import { safeRedisSet } from "@/lib/redis-helpers"
+import { IndexingQueue } from "@/lib/queue"
+import { getStorageProvider } from "@/lib/storage"
+import path from "path"
+import { v4 as uuidv4 } from "uuid"
 
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
-})
+const indexingQueue = new IndexingQueue()
+const storage = getStorageProvider()
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,52 +35,67 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File too large. Maximum size is 10MB" }, { status: 400 })
     }
 
+    // Generate unique IDs
+    const docId = `doc_${Date.now()}`
+    const jobId = uuidv4()
+    
     // Read file content
     const fileContent = await file.text()
+    
+    // Generate storage path
+    const fileExtension = path.extname(file.name)
+    const storagePath = `documents/${docId}${fileExtension}`
+    
+    // Save file to storage
+    await storage.saveFile(storagePath, fileContent)
+    console.log(`[v0] File saved to storage at: ${storagePath}`)
 
-    // Simulate document processing
-    const docId = `doc_${Date.now()}`
+    // Create document metadata (without content)
     const documentData = {
       id: docId,
       title: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
       filename: file.name,
       size: file.size,
       uploadDate: new Date().toISOString(),
-      status: "processing",
+      status: "queued",
       chunks: 0,
-      content: fileContent,
+      storagePath: storagePath,
     }
 
     // Store document metadata in Redis
-    await redis.set(`document:${docId}`, JSON.stringify(documentData))
+    await safeRedisSet(`document:${docId}`, documentData)
 
-    // In production, this would trigger the RAG indexing pipeline
-    console.log("[v0] Document stored for processing:", docId)
-
-    // Simulate processing completion after a delay
-    setTimeout(async () => {
-      try {
-        const updatedDoc = {
-          ...documentData,
-          status: "indexed",
-          chunks: Math.floor(fileContent.length / 500), // Simulate chunk count
-        }
-        await redis.set(`document:${docId}`, JSON.stringify(updatedDoc))
-        console.log("[v0] Document processing completed:", docId)
-      } catch (error) {
-        console.error("[v0] Document processing error:", error)
+    // Create job and add to indexing queue
+    const jobResult = await indexingQueue.enqueue({
+      docId,
+      storagePath,
+      metadata: {
+        filename: file.name,
+        fileType: file.type,
+        fileSize: file.size
       }
-    }, 3000)
+    })
+    
+    if (!jobResult.success) {
+      throw new Error("Failed to enqueue document for processing")
+    }
+    
+    console.log("[v0] Document queued for processing:", { docId, jobId: jobResult.jobId })
 
+    // Return 202 Accepted with job information
     return NextResponse.json({
       success: true,
       document: {
         id: docId,
         title: documentData.title,
         filename: documentData.filename,
-        status: "processing",
+        status: "queued",
       },
-    })
+      job: {
+        id: jobResult.jobId,
+        status: "queued"
+      }
+    }, { status: 202 }) // 202 Accepted
   } catch (error) {
     console.error("[v0] Upload API error:", error)
     return NextResponse.json({ error: "Upload failed" }, { status: 500 })

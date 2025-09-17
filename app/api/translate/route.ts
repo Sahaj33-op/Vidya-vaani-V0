@@ -1,11 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { Redis } from "@upstash/redis"
-
-// Initialize Redis client for caching
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
-})
+import { safeRedisGet, safeRedisSet, cacheKeyFor } from "@/lib/redis-helpers"
 
 interface TranslationRequest {
   text: string
@@ -39,8 +33,8 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Translation request:", { text: text.substring(0, 50), source_lang, target_lang })
 
     // Check cache first
-    const cacheKey = `translate:${source_lang || "auto"}:${target_lang}:${text.toLowerCase().trim()}`
-    const cachedResponse = await redis.get(cacheKey)
+    const cacheKey = cacheKeyFor(`${source_lang || "auto"}:${target_lang}`, text)
+    const cachedResponse = await safeRedisGet(cacheKey)
 
     if (cachedResponse) {
       console.log("[v0] Returning cached translation")
@@ -51,7 +45,7 @@ export async function POST(request: NextRequest) {
     const translationResult = await simulateTranslation(text, source_lang, target_lang, detect_language)
 
     // Cache the result for 1 hour
-    await redis.setex(cacheKey, 3600, translationResult)
+    await safeRedisSet(cacheKey, translationResult, 3600)
 
     console.log("[v0] Translation completed:", translationResult)
     return NextResponse.json(translationResult)
