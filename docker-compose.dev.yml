@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # Next.js Development Server
+  nextjs-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - KV_REST_API_URL=${KV_REST_API_URL}
+      - KV_REST_API_TOKEN=${KV_REST_API_TOKEN}
+      - UPSTASH_SEARCH_REST_URL=${UPSTASH_SEARCH_REST_URL}
+      - UPSTASH_SEARCH_REST_TOKEN=${UPSTASH_SEARCH_REST_TOKEN}
+    depends_on:
+      - redis-dev
+      - rasa-dev
+    networks:
+      - chatbot-dev-network
+    command: npm run dev
+
+  # Rasa Development Server
+  rasa-dev:
+    build:
+      context: ./rasa
+      dockerfile: Dockerfile
+    ports:
+      - "5005:5005"
+    volumes:
+      - ./rasa:/app
+    environment:
+      - RASA_MODEL_SERVER=http://rasa-dev:5005
+      - REDIS_URL=redis://redis-dev:6379
+    depends_on:
+      - redis-dev
+      - rasa-actions-dev
+    networks:
+      - chatbot-dev-network
+    command: ["run", "--enable-api", "--cors", "*", "--debug", "--reload"]
+
+  # Rasa Actions Development Server
+  rasa-actions-dev:
+    build:
+      context: ./rasa
+      dockerfile: Dockerfile
+    ports:
+      - "5055:5055"
+    volumes:
+      - ./rasa/actions:/app/actions
+    environment:
+      - REDIS_URL=redis://redis-dev:6379
+    depends_on:
+      - redis-dev
+    networks:
+      - chatbot-dev-network
+    command: ["run", "actions", "--debug"]
+
+  # Redis for Development
+  redis-dev:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - chatbot-dev-network
+    command: redis-server
+
+  # Python Development Environment for RAG/Translation
+  python-dev:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./retriever:/app/retriever
+      - ./translation:/app/translation
+      - ./scripts:/app/scripts
+    environment:
+      - FLASK_ENV=development
+      - REDIS_URL=redis://redis-dev:6379
+    depends_on:
+      - redis-dev
+    networks:
+      - chatbot-dev-network
+    command: flask run --host=0.0.0.0 --port=8000 --debug
+
+networks:
+  chatbot-dev-network:
+    driver: bridge

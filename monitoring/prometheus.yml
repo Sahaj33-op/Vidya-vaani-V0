@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'nextjs-app'
+    static_configs:
+      - targets: ['nextjs-app:3000']
+    metrics_path: '/api/metrics'
+
+  - job_name: 'rasa-server'
+    static_configs:
+      - targets: ['rasa-server:5005']
+    metrics_path: '/metrics'
+
+  - job_name: 'flask-backend'
+    static_configs:
+      - targets: ['flask-backend:8000']
+    metrics_path: '/metrics'
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

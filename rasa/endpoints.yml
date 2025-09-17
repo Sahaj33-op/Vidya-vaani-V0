@@ -1,0 +1,19 @@
+# Endpoints configuration for Rasa
+action_endpoint:
+  url: "http://localhost:5055/webhook"
+
+tracker_store:
+  type: redis
+  url: ${REDIS_URL}
+  key_prefix: "rasa:"
+  record_exp: 30000
+
+lock_store:
+  type: redis
+  url: ${REDIS_URL}
+  key_prefix: "rasa_lock:"
+
+event_broker:
+  type: redis
+  url: ${REDIS_URL}
+  key_prefix: "rasa_events:"

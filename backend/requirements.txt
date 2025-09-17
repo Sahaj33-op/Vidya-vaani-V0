@@ -1,0 +1,12 @@
+flask==2.3.3
+redis==5.0.1
+sentence-transformers==2.2.2
+faiss-cpu==1.7.4
+transformers==4.35.0
+torch==2.1.0
+numpy==1.24.3
+pandas==2.0.3
+langdetect==1.0.9
+requests==2.31.0
+python-dotenv==1.0.0
+flask-cors==4.0.0

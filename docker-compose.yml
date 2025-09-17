@@ -1,0 +1,148 @@
+version: '3.8'
+
+services:
+  # Next.js Frontend Application
+  nextjs-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - KV_REST_API_URL=${KV_REST_API_URL}
+      - KV_REST_API_TOKEN=${KV_REST_API_TOKEN}
+      - UPSTASH_SEARCH_REST_URL=${UPSTASH_SEARCH_REST_URL}
+      - UPSTASH_SEARCH_REST_TOKEN=${UPSTASH_SEARCH_REST_TOKEN}
+    depends_on:
+      - redis
+      - rasa-server
+      - flask-backend
+    networks:
+      - chatbot-network
+    restart: unless-stopped
+
+  # Rasa NLU and Core Server
+  rasa-server:
+    build:
+      context: ./rasa
+      dockerfile: Dockerfile
+    ports:
+      - "5005:5005"
+    volumes:
+      - ./rasa/models:/app/models
+      - ./rasa/data:/app/data
+    environment:
+      - RASA_MODEL_SERVER=http://rasa-server:5005
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+      - rasa-actions
+    networks:
+      - chatbot-network
+    restart: unless-stopped
+    command: ["run", "--enable-api", "--cors", "*", "--debug"]
+
+  # Rasa Custom Actions Server
+  rasa-actions:
+    build:
+      context: ./rasa
+      dockerfile: Dockerfile
+    ports:
+      - "5055:5055"
+    volumes:
+      - ./rasa/actions:/app/actions
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    networks:
+      - chatbot-network
+    restart: unless-stopped
+    command: ["run", "actions"]
+
+  # Flask Backend API
+  flask-backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./retriever:/app/retriever
+      - ./translation:/app/translation
+      - ./data:/app/data
+    environment:
+      - FLASK_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - RASA_SERVER_URL=http://rasa-server:5005
+    depends_on:
+      - redis
+      - rasa-server
+    networks:
+      - chatbot-network
+    restart: unless-stopped
+
+  # Redis Cache and Session Store
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - chatbot-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # NGINX Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - nextjs-app
+      - flask-backend
+    networks:
+      - chatbot-network
+    restart: unless-stopped
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - chatbot-network
+    restart: unless-stopped
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    networks:
+      - chatbot-network
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  chatbot-network:
+    driver: bridge

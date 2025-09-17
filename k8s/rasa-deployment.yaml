@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rasa-deployment
+  namespace: multilingual-chatbot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rasa
+  template:
+    metadata:
+      labels:
+        app: rasa
+    spec:
+      containers:
+      - name: rasa
+        image: multilingual-chatbot/rasa:latest
+        ports:
+        - containerPort: 5005
+        env:
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: chatbot-config
+              key: REDIS_URL
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: rasa-models
+          mountPath: /app/models
+      volumes:
+      - name: rasa-models
+        persistentVolumeClaim:
+          claimName: rasa-models-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rasa-service
+  namespace: multilingual-chatbot
+spec:
+  selector:
+    app: rasa
+  ports:
+  - port: 5005
+    targetPort: 5005
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rasa-models-pvc
+  namespace: multilingual-chatbot
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

@@ -1,0 +1,109 @@
+# Domain configuration for multilingual education chatbot
+version: "3.1"
+
+intents:
+  - greet
+  - goodbye
+  - affirm
+  - deny
+  - ask_fees
+  - ask_admission
+  - ask_timetable
+  - ask_contact
+  - ask_documents
+  - request_human_handoff
+  - provide_feedback
+  - out_of_scope
+  - nlu_fallback
+
+entities:
+  - course_type
+  - academic_year
+  - department
+  - document_type
+  - language_preference
+
+slots:
+  user_id:
+    type: text
+    mappings:
+    - type: custom
+  
+  language_preference:
+    type: categorical
+    values:
+      - en
+      - hi
+      - mr
+      - mwr
+    mappings:
+    - type: from_entity
+      entity: language_preference
+  
+  course_type:
+    type: categorical
+    values:
+      - undergraduate
+      - postgraduate
+      - diploma
+      - certificate
+    mappings:
+    - type: from_entity
+      entity: course_type
+  
+  department:
+    type: text
+    mappings:
+    - type: from_entity
+      entity: department
+  
+  requested_info:
+    type: text
+    mappings:
+    - type: custom
+
+responses:
+  utter_greet:
+    - text: "Hello! I'm your college assistant. I can help you with admissions, fees, timetables, and more. How can I assist you today?"
+    - text: "Hi there! Welcome to our college support system. What information are you looking for?"
+  
+  utter_greet_hindi:
+    - text: "नमस्ते! मैं आपका कॉलेज सहायक हूं। मैं प्रवेश, फीस, समय सारणी और अन्य चीजों में आपकी मदद कर सकता हूं। आज मैं आपकी कैसे सहायता कर सकता हूं?"
+  
+  utter_goodbye:
+    - text: "Goodbye! Feel free to ask if you need any more help with college information."
+    - text: "Thank you for using our college assistant. Have a great day!"
+  
+  utter_default:
+    - text: "I'm sorry, I didn't understand that. Could you please rephrase your question about admissions, fees, timetables, or contact information?"
+  
+  utter_ask_rephrase:
+    - text: "I'm not sure I understand. Could you please ask about admissions, fees, timetables, or contact information?"
+  
+  utter_human_handoff:
+    - text: "I'll connect you with a human assistant. Please wait while I transfer your conversation."
+  
+  utter_feedback_thanks:
+    - text: "Thank you for your feedback! It helps us improve our service."
+
+actions:
+  - action_get_fees_info
+  - action_get_admission_info
+  - action_get_timetable
+  - action_get_contact_info
+  - action_search_documents
+  - action_handoff_to_human
+  - action_detect_language
+  - action_translate_response
+  - action_default_fallback
+  - validate_course_info_form
+
+forms:
+  course_info_form:
+    required_slots:
+      - course_type
+      - department
+
+session_config:
+  session_expiration_time: 60
+  carry_over_slots_to_new_session: true

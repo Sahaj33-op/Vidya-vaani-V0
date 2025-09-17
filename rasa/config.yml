@@ -1,0 +1,68 @@
+# Rasa NLU and Core configuration for multilingual education chatbot
+version: "3.1"
+
+recipe: default.v1
+
+language: en
+
+pipeline:
+  # Language model for multilingual support
+  - name: SpacyNLP
+    model: "en_core_web_md"
+    case_sensitive: false
+  
+  # Tokenization
+  - name: SpacyTokenizer
+  
+  # Feature extraction
+  - name: SpacyFeaturizer
+    pooling: mean
+  
+  # Regular expression features
+  - name: RegexFeaturizer
+  
+  # Lookup table features
+  - name: LexicalSyntacticFeaturizer
+  
+  # Count vectors for bag-of-words
+  - name: CountVectorsFeaturizer
+    analyzer: char_wb
+    min_ngram: 1
+    max_ngram: 4
+  
+  # Intent classification
+  - name: DIETClassifier
+    epochs: 100
+    constrain_similarities: true
+    model_confidence: linear_norm
+    
+  # Entity extraction
+  - name: EntitySynonymMapper
+  
+  # Response selection
+  - name: ResponseSelector
+    epochs: 100
+    constrain_similarities: true
+    model_confidence: linear_norm
+
+policies:
+  # Memoization for exact matches
+  - name: MemoizationPolicy
+  
+  # Rule-based policy for definite paths
+  - name: RulePolicy
+    core_fallback_threshold: 0.4
+    core_fallback_action_name: "action_default_fallback"
+    enable_fallback_prediction: true
+  
+  # Machine learning policy
+  - name: UnexpecTEDIntentPolicy
+    max_history: 5
+    epochs: 100
+  
+  # Transformer policy for complex conversations
+  - name: TEDPolicy
+    max_history: 5
+    epochs: 100
+    constrain_similarities: true
+    model_confidence: linear_norm

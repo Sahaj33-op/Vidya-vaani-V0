@@ -1,0 +1,224 @@
+# NLU training data for multilingual education chatbot
+version: "3.1"
+
+nlu:
+- intent: greet
+  examples: |
+    - hello
+    - hi
+    - hey
+    - good morning
+    - good afternoon
+    - good evening
+    - namaste
+    - नमस्ते
+    - हैलो
+    - हाय
+    - सुप्रभात
+    - नमस्कार
+
+- intent: goodbye
+  examples: |
+    - bye
+    - goodbye
+    - see you later
+    - talk to you later
+    - thanks bye
+    - धन्यवाद
+    - अलविदा
+    - फिर मिलेंगे
+    - बाय
+
+- intent: affirm
+  examples: |
+    - yes
+    - yeah
+    - yep
+    - sure
+    - of course
+    - that sounds good
+    - correct
+    - हां
+    - जी हां
+    - ठीक है
+    - सही है
+
+- intent: deny
+  examples: |
+    - no
+    - nope
+    - not really
+    - I don't think so
+    - नहीं
+    - ना
+    - गलत
+
+- intent: ask_fees
+  examples: |
+    - what are the fees?
+    - how much does it cost?
+    - fee structure
+    - tuition fees
+    - college fees
+    - admission fees
+    - what is the cost of [undergraduate](course_type) program?
+    - fees for [computer science](department)
+    - फीस कितनी है?
+    - शुल्क क्या है?
+    - कॉलेज की फीस
+    - प्रवेश शुल्क
+    - ट्यूशन फीस
+    - [स्नातक](course_type) की फीस
+    - [कंप्यूटर साइंस](department) की फीस
+
+- intent: ask_admission
+  examples: |
+    - admission process
+    - how to apply?
+    - admission requirements
+    - application deadline
+    - entrance exam
+    - admission criteria
+    - when is the last date for admission?
+    - documents required for admission
+    - प्रवेश प्रक्रिया
+    - आवेदन कैसे करें?
+    - प्रवेश आवश्यकताएं
+    - आवेदन की अंतिम तिथि
+    - प्रवेश परीक्षा
+    - प्रवेश मानदंड
+    - दस्तावेज़ चाहिए
+
+- intent: ask_timetable
+  examples: |
+    - class schedule
+    - timetable
+    - class timings
+    - when are the classes?
+    - college timing
+    - academic calendar
+    - exam schedule
+    - [computer science](department) timetable
+    - [first year](academic_year) schedule
+    - कक्षा का समय
+    - समय सारणी
+    - कॉलेज का समय
+    - परीक्षा कार्यक्रम
+    - शैक्षणिक कैलेंडर
+    - [कंप्यूटर साइंस](department) का समय
+    - [प्रथम वर्ष](academic_year) की समय सारणी
+
+- intent: ask_contact
+  examples: |
+    - contact information
+    - phone number
+    - email address
+    - college address
+    - how to contact?
+    - office hours
+    - admission office contact
+    - principal contact
+    - संपर्क जानकारी
+    - फोन नंबर
+    - ईमेल पता
+    - कॉलेज का पता
+    - संपर्क कैसे करें?
+    - कार्यालय समय
+    - प्रवेश कार्यालय संपर्क
+
+- intent: ask_documents
+  examples: |
+    - what documents do I need?
+    - required documents
+    - document list
+    - certificates needed
+    - marksheet requirements
+    - ID proof required
+    - कौन से दस्तावेज़ चाहिए?
+    - आवश्यक दस्तावेज़
+    - प्रमाणपत्र चाहिए
+    - मार्कशीट आवश्यकताएं
+    - पहचान प्रमाण
+
+- intent: request_human_handoff
+  examples: |
+    - I want to talk to a human
+    - connect me to someone
+    - speak to a person
+    - human help
+    - talk to staff
+    - I need personal assistance
+    - मुझे किसी व्यक्ति से बात करनी है
+    - स्टाफ से बात कराएं
+    - व्यक्तिगत सहायता चाहिए
+
+- intent: provide_feedback
+  examples: |
+    - I want to give feedback
+    - this was helpful
+    - this was not helpful
+    - good service
+    - bad service
+    - suggestion
+    - complaint
+    - फीडबैक देना चाहता हूं
+    - यह सहायक था
+    - अच्छी सेवा
+    - सुझाव
+
+- intent: out_of_scope
+  examples: |
+    - what's the weather like?
+    - tell me a joke
+    - what's your favorite color?
+    - how old are you?
+    - what's for lunch?
+    - play music
+    - मौसम कैसा है?
+    - जोक सुनाओ
+    - आपका पसंदीदा रंग क्या है?
+
+- lookup: course_type
+  examples: |
+    - undergraduate
+    - postgraduate
+    - diploma
+    - certificate
+    - bachelor
+    - master
+    - PhD
+    - स्नातक
+    - स्नातकोत्तर
+    - डिप्लोमा
+    - प्रमाणपत्र
+
+- lookup: department
+  examples: |
+    - computer science
+    - mechanical engineering
+    - electrical engineering
+    - civil engineering
+    - business administration
+    - commerce
+    - arts
+    - science
+    - mathematics
+    - physics
+    - chemistry
+    - कंप्यूटर साइंस
+    - मैकेनिकल इंजीनियरिंग
+    - इलेक्ट्रिकल इंजीनियरिंग
+    - वाणिज्य
+    - कला
+    - विज्ञान
+    - गणित
+    - भौतिकी
+    - रसायन
+
+- regex: email
+  examples: |
+    - [a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}
+
+- regex: phone
+  examples: |
+    - (\+91|91|0)?[6-9]\d{9}

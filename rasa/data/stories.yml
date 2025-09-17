@@ -1,0 +1,74 @@
+# Stories for conversation flow training
+version: "3.1"
+
+stories:
+
+- story: greet and ask fees
+  steps:
+  - intent: greet
+  - action: utter_greet
+  - intent: ask_fees
+  - action: action_get_fees_info
+
+- story: greet and ask admission
+  steps:
+  - intent: greet
+  - action: utter_greet
+  - intent: ask_admission
+  - action: action_get_admission_info
+
+- story: ask timetable with course info
+  steps:
+  - intent: ask_timetable
+  - action: course_info_form
+  - active_loop: course_info_form
+  - slot_was_set:
+    - requested_slot: course_type
+  - intent: ask_fees
+    entities:
+    - course_type: "undergraduate"
+  - slot_was_set:
+    - course_type: "undergraduate"
+  - slot_was_set:
+    - requested_slot: department
+  - intent: ask_fees
+    entities:
+    - department: "computer science"
+  - slot_was_set:
+    - department: "computer science"
+  - active_loop: null
+  - action: action_get_timetable
+
+- story: request human handoff
+  steps:
+  - intent: request_human_handoff
+  - action: action_handoff_to_human
+
+- story: out of scope handling
+  steps:
+  - intent: out_of_scope
+  - action: utter_ask_rephrase
+
+- story: provide feedback
+  steps:
+  - intent: provide_feedback
+  - action: utter_feedback_thanks
+
+- story: goodbye
+  steps:
+  - intent: goodbye
+  - action: utter_goodbye
+
+- story: fallback flow
+  steps:
+  - intent: nlu_fallback
+  - action: action_default_fallback
+
+- story: multilingual greeting
+  steps:
+  - intent: greet
+  - action: action_detect_language
+  - action: utter_greet_hindi
+  - intent: ask_fees
+  - action: action_get_fees_info
+  - action: action_translate_response

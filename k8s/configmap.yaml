@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chatbot-config
+  namespace: multilingual-chatbot
+data:
+  NODE_ENV: "production"
+  FLASK_ENV: "production"
+  RASA_SERVER_URL: "http://rasa-service:5005"
+  REDIS_URL: "redis://redis-service:6379"
