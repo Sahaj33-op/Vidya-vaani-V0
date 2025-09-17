@@ -1,5 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { safeRedisGet, safeRedisSet, cacheKeyFor } from "@/lib/redis-helpers"
+import { safeRedisGet, safeRedisSet, cacheKeyFor, redis } from "@/lib/redis-helpers"
+import { rateLimitMiddleware } from "@/lib/rate-limiter"
+import crypto from "crypto"
+import { franc } from 'franc'
+import { validateEnvironment } from "@/lib/env-validator"
+
+// Validate environment variables on startup
+validateEnvironment()
 
 interface ChatRequest {
   user_id: string
@@ -16,10 +23,33 @@ interface ChatResponse {
   original_language?: string
 }
 
+const cacheIntent = async (text: string): Promise<string> => {
+  const cacheKey = `intent:${crypto.createHash('md5').update(text).digest('hex')}`
+  
+  let intent = await safeRedisGet(cacheKey)
+  if (intent) {
+    return intent
+  }
+  
+  intent = detectIntent(text)
+  await safeRedisSet(cacheKey, intent, 3600) // Cache for 1 hour
+  
+  return intent
+}
+
 export async function POST(request: NextRequest) {
+  const rateLimitResult = await rateLimitMiddleware(10, 60000)(request) // 10 requests per minute
+  if (rateLimitResult instanceof NextResponse) return rateLimitResult
+
+  let user_id: string | undefined
+  let text: string | undefined
+  let lang: string | undefined
+
   try {
     const body: ChatRequest = await request.json()
-    const { user_id, text, lang = "en" } = body
+    user_id = body.user_id
+    text = body.text
+    lang = body.lang || "en"
 
     if (!text?.trim()) {
       return NextResponse.json({ error: "Message text is required" }, { status: 400 })
@@ -73,7 +103,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Simulate NLU intent detection on processed text
-    const intent = detectIntent(processedText)
+    const intent = await cacheIntent(processedText)
     console.log("[v0] Detected intent:", intent)
 
     // Generate response based on intent
@@ -111,13 +141,23 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Generated response:", response)
     return NextResponse.json(response)
-  } catch (error) {
-    console.error("[v0] Chat API error:", error)
+  } catch (error: any) {
+    // Log detailed error for debugging
+    console.error("[v0] Chat API error:", {
+      error: error.message,
+      stack: error.stack,
+      userId: user_id,
+      timestamp: new Date().toISOString(),
+    })
+
+    // Return user-friendly error with error ID for tracking
+    const errorId = crypto.randomUUID()
     return NextResponse.json(
       {
-        reply: "I apologize, but I'm experiencing technical difficulties. Please try again later.",
+        reply: `I'm experiencing technical difficulties. Error ID: ${errorId}`,
         confidence: 0,
         action: "error",
+        errorId,
       },
       { status: 500 },
     )
@@ -125,29 +165,23 @@ export async function POST(request: NextRequest) {
 }
 
 function detectLanguageFromText(text: string): string {
-  // Enhanced language detection
-  const lowerText = text.toLowerCase()
-
-  // Check for Devanagari script
-  if (/[\u0900-\u097F]/.test(text)) {
-    // Check for Marwari-specific words
-    const marwariWords = ["थारो", "थारी", "म्हारो", "म्हारी", "करूं", "आवो", "जावो", "राखो", "लावो"]
-    if (marwariWords.some((word) => text.includes(word))) {
-      return "mwr"
+  try {
+    // Use franc for better language detection
+    const detected = franc(text, { minLength: 3 })
+    
+    // Map franc codes to our language codes
+    const languageMap: Record<string, string> = {
+      'hin': 'hi',  // Hindi
+      'mar': 'mr',  // Marathi
+      'eng': 'en',  // English
+      'raj': 'mwr'  // Rajasthani (closest to Marwari)
     }
-
-    // Check for Marathi-specific words
-    const marathiWords = ["आहे", "आहेत", "करतो", "करते", "तुम्ही", "माझा", "माझी"]
-    if (marathiWords.some((word) => text.includes(word))) {
-      return "mr"
-    }
-
-    // Default to Hindi for Devanagari
-    return "hi"
+    
+    return languageMap[detected] || 'en'
+  } catch (error) {
+    console.error('Language detection failed:', error)
+    return 'en'
   }
-
-  // Default to English for Latin script
-  return "en"
 }
 
 function detectIntent(text: string): string {

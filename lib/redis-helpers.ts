@@ -1,7 +1,50 @@
 import { Redis } from "@upstash/redis"
 import crypto from "crypto"
 
-let redis: Redis | null = null
+class RedisManager {
+  private static instance: Redis | null = null
+
+  static getInstance(): Redis | null {
+    if (!this.instance) {
+      this.instance = this.initializeConnection()
+    }
+    return this.instance
+  }
+
+  private static initializeConnection(): Redis | null {
+    try {
+      const url = process.env.KV_REST_API_URL
+      const token = process.env.KV_REST_API_TOKEN
+
+      if (!url || !token) {
+        console.warn("[v0] Redis credentials missing, running without cache")
+        return null
+      }
+
+      if (!url.startsWith("https://")) {
+        console.error("[v0] Invalid Redis URL format")
+        return null
+      }
+
+      const redisClient = new Redis({
+        url: url,
+        token: token,
+        retry: {
+          retries: 3,
+          backoff: (retryCount) => Math.exp(retryCount) * 100,
+        },
+      })
+
+      console.log("[v0] Redis client initialized successfully")
+      return redisClient
+    } catch (error) {
+      console.error("Redis connection failed:", error)
+      return null
+    }
+  }
+}
+
+export const redis = RedisManager.getInstance()
 
 /**
  * Creates a secure, hashed Redis cache key from language and text
@@ -20,42 +63,7 @@ export function cacheKeyFor(lang: string, text: string): string {
  * @returns Redis client or null if initialization fails
  */
 export function initializeRedis(): Redis | null {
-  try {
-    const url = process.env.KV_REST_API_URL
-    const token = process.env.KV_REST_API_TOKEN
-
-    console.log("[v0] Redis config validation:", {
-      hasUrl: !!url,
-      hasToken: !!token,
-      urlValid: url?.startsWith("https://"),
-      tokenLength: token?.length || 0,
-    })
-
-    if (!url || !token) {
-      console.warn("[v0] Redis credentials missing, running without cache")
-      return null
-    }
-
-    if (!url.startsWith("https://")) {
-      console.error("[v0] Invalid Redis URL format")
-      return null
-    }
-
-    const redisClient = new Redis({
-      url: url,
-      token: token,
-      retry: {
-        retries: 2,
-        backoff: (retryCount) => Math.exp(retryCount) * 50,
-      },
-    })
-
-    console.log("[v0] Redis client initialized successfully")
-    return redisClient
-  } catch (error) {
-    console.error("[v0] Redis initialization failed:", error)
-    return null
-  }
+  return RedisManager.getInstance()
 }
 
 /**
@@ -64,14 +72,12 @@ export function initializeRedis(): Redis | null {
  * @returns Retrieved value or null if operation fails
  */
 export async function safeRedisGet(key: string): Promise<any> {
-  if (!redis) {
-    redis = initializeRedis()
-    if (!redis) return null
-  }
+  const redisClient = RedisManager.getInstance()
+  if (!redisClient) return null
 
   try {
     console.log("[v0] Attempting Redis get with key:", key)
-    const result = await redis.get(key)
+    const result = await redisClient.get(key)
     console.log("[v0] Redis get successful:", !!result)
     
     // Parse JSON if the result is a string
@@ -98,20 +104,18 @@ export async function safeRedisGet(key: string): Promise<any> {
  * @returns Success status
  */
 export async function safeRedisSet(key: string, value: any, ttl: number): Promise<boolean> {
-  if (!redis) {
-    redis = initializeRedis()
-    if (!redis) return false
-  }
+  const redisClient = RedisManager.getInstance()
+  if (!redisClient) return false
 
   try {
     // Ensure value is properly stringified
     const payload = typeof value === "string" ? value : JSON.stringify(value)
     
     // Handle different Redis client API patterns
-    if (typeof redis.setex === 'function') {
-      await redis.setex(key, ttl, payload)
+    if (typeof redisClient.setex === 'function') {
+      await redisClient.setex(key, ttl, payload)
     } else {
-      await redis.set(key, payload, { ex: ttl })
+      await redisClient.set(key, payload, { ex: ttl })
     }
     
     console.log("[v0] Redis set successful")

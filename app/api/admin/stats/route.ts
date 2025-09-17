@@ -1,21 +1,31 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { Redis } from "@upstash/redis"
-
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
-})
+import { redis } from "@/lib/redis-helpers"
+import { requireAuth } from "@/lib/auth"
 
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth(request)
+  if (authResult instanceof NextResponse) return authResult
+
   try {
-    // Simulate system statistics
+    if (!redis) {
+      console.error("[v0] Redis client not initialized.")
+      return NextResponse.json({ error: "Internal server error: Redis not available" }, { status: 500 })
+    }
+
+    const redisClient = redis // Ensure redis is not null for type narrowing
+
+    // Get real statistics from Redis
+    const totalDocuments = (await redisClient.keys("document:*")).length
+    const totalHandoffRequests = (await redisClient.keys("handoff:*")).length
+    // For totalChunks, totalQueries, avgResponseTime, activeUsers, we would need to store and retrieve this data.
+    // For now, these will remain simulated or be set to 0.
     const stats = {
-      totalDocuments: 15,
-      totalChunks: 342,
-      totalQueries: 1247,
-      avgResponseTime: 850,
-      activeUsers: 23,
-      handoffRequests: 2,
+      totalDocuments: totalDocuments,
+      totalChunks: 0, // Placeholder, needs actual implementation to track chunks
+      totalQueries: 0, // Placeholder, needs actual implementation to track queries
+      avgResponseTime: 0, // Placeholder, needs actual implementation to track response times
+      activeUsers: 0, // Placeholder, needs actual implementation to track active users
+      handoffRequests: totalHandoffRequests,
     }
 
     return NextResponse.json(stats)
