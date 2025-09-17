@@ -1,9 +1,33 @@
-import { IndexingQueue } from "../lib/queue";
-import { initializeRedis, safeRedisGet, safeRedisSet } from "../lib/redis-helpers";
+import { IndexingQueue, IndexingJob } from "../lib/queue";
+import {      const batchId = `batch_${batchIndex}_${Date.now()}`;
+      
+      try {
+        // Track batch progress
+        await progress.trackBatch(job.jobId, batchId, i, i + batchChunks.length - 1, chunks.length);
+        
+        // Process batch
+        await processBatch(job, batchChunks, batchIndex, totalBatches, { title, filename });
+        
+        // Mark batch as completed and update progress
+        await progress.completeBatch(job.jobId, batchId);
+        
+        console.log(`[Worker] Processed batch ${batchIndex + 1}/${totalBatches} for document ${job.docId}`);
+      } catch (error) {
+        console.error(`[Worker] Error processing batch ${batchIndex + 1}:`, error);
+        
+        // Mark batch as failed but continue with next batch
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        await progress.completeBatch(job.jobId, batchId, errorMessage);
+      }safeRedisGet, safeRedisSet } from "../lib/redis-helpers";
+import { processBatch } from "./batch-processor";
+import { ProgressTracker } from "../lib/progress-tracker";
+import { v4 as uuidv4 } from "uuid";
 
-// Initialize Redis client
+// Initialize services
 const redis = initializeRedis();
 const queue = new IndexingQueue();
+const progress = new ProgressTracker();
+const workerId = `worker_${uuidv4()}`;
 
 // Configuration
 const CHUNK_SIZE = 500; // Characters per chunk
@@ -15,45 +39,69 @@ let activeJobs = 0;
 let isRunning = true;
 
 /**
- * Process a document from the queue
- * @param documentId Document ID to process
+ * Process a document from the queue with batched operations
+ * @param job Indexing job to process
  */
-async function processDocument(documentId: string): Promise<void> {
-  console.log(`[Worker] Processing document: ${documentId}`);
+async function processDocument(job: IndexingJob): Promise<void> {
+  console.log(`[Worker] Processing document: ${job.docId}`);
   
   try {
     // Get document data from Redis
-    const documentData = await safeRedisGet(`document:${documentId}`);
+    const documentData = await safeRedisGet(`document:${job.docId}`);
     
     if (!documentData) {
-      throw new Error(`Document ${documentId} not found`);
+      throw new Error(`Document ${job.docId} not found`);
     }
     
     // Extract content and create chunks
     const { content, title, filename } = documentData;
     
     if (!content) {
-      throw new Error(`Document ${documentId} has no content`);
+      throw new Error(`Document ${job.docId} has no content`);
     }
     
-    // Create chunks from content
+    // Create chunks from content with overlap
     const chunks = createChunks(content, CHUNK_SIZE);
-    console.log(`[Worker] Created ${chunks.length} chunks for document ${documentId}`);
+    console.log(`[Worker] Created ${chunks.length} chunks for document ${job.docId}`);
     
-    // Store each chunk in Redis
-    for (let i = 0; i < chunks.length; i++) {
-      const chunkId = `${documentId}_chunk_${i}`;
-      await safeRedisSet(`chunk:${chunkId}`, {
-        id: chunkId,
-        documentId,
-        content: chunks[i],
-        index: i,
-        metadata: {
-          title,
-          filename,
-          totalChunks: chunks.length
-        }
-      });
+    // Process chunks in batches
+    const BATCH_SIZE = 10; // Process 10 chunks concurrently
+    let processed = 0;
+    const totalBatches = Math.ceil(chunks.length / BATCH_SIZE);
+    
+    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+      const batchChunks = chunks.slice(i, i + BATCH_SIZE);
+      const batchIndex = Math.floor(i / BATCH_SIZE);
+      
+      try {
+        // Process batch concurrently
+        await processBatch(
+          job,
+          batchChunks,
+          batchIndex,
+          totalBatches,
+          { title, filename }
+        );
+        
+        processed += batchChunks.length;
+        
+        // Track batch progress
+        const batchId = `batch_${batchIndex}_${Date.now()}`;
+        await progress.trackBatch(job.jobId, batchId, i, i + batchChunks.length - 1, chunks.length);
+        
+        // Process batch
+        await processBatch(job, batchChunks, batchIndex, totalBatches, { title, filename });
+        
+        // Mark batch as completed and update progress
+        await progress.completeBatch(job.jobId, batchId);
+        
+        console.log(`[Worker] Processed batch ${batchIndex + 1}/${totalBatches} for document ${job.docId}`);
+      } catch (batchError) {
+        console.error(`[Worker] Error processing batch ${batchIndex + 1}:`, batchError);
+        
+        // Mark batch as failed but continue with next batch
+        await progress.completeBatch(job.jobId, batchId, batchError.message);
+      }
     }
     
     // Update document status
@@ -61,21 +109,27 @@ async function processDocument(documentId: string): Promise<void> {
       ...documentData,
       status: "indexed",
       chunks: chunks.length,
-      indexedAt: new Date().toISOString()
+      indexedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString()
     };
     
-    await safeRedisSet(`document:${documentId}`, updatedDoc);
+    await safeRedisSet(
+      `document:${job.docId}`,
+      updatedDoc,
+      86400 // 24 hour expiry
+    );
     
     // Mark job as complete
-    await queue.complete(documentId, {
+    await queue.complete(job.jobId, {
       chunks: chunks.length,
-      indexedAt: new Date().toISOString()
+      indexedAt: new Date().toISOString(),
+      progress: 100
     });
     
-    console.log(`[Worker] Successfully indexed document: ${documentId} (${chunks.length} chunks)`);
+    console.log(`[Worker] Successfully indexed document: ${job.docId} (${chunks.length} chunks)`);
   } catch (error) {
-    console.error(`[Worker] Failed to process document ${documentId}:`, error);
-    await queue.fail(documentId, error);
+    console.error(`[Worker] Failed to process document ${job.docId}:`, error);
+    await queue.fail(job.jobId, error);
   } finally {
     activeJobs--;
   }
@@ -128,35 +182,37 @@ function createChunks(text: string, chunkSize: number): string[] {
  * Main worker loop
  */
 async function workerLoop(): Promise<void> {
-  console.log("[Worker] Starting indexing worker");
+  console.log(`[Worker ${workerId}] Starting indexing worker`);
   
   while (isRunning) {
     try {
       // Check queue stats
       const stats = await queue.getStats();
-      console.log(`[Worker] Queue stats: ${stats.queued} queued, ${stats.processing} processing, ${activeJobs} active jobs`);
+      console.log(`[Worker ${workerId}] Queue stats: ${stats.queued} queued, ${stats.processing} processing, ${activeJobs} active jobs`);
       
       // Process documents if capacity available
       while (activeJobs < MAX_CONCURRENT_JOBS) {
-        const documentId = await queue.dequeue();
+        const jobs = await queue.dequeue(workerId);
         
-        if (!documentId) {
-          console.log("[Worker] No documents in queue");
+        if (jobs.length === 0) {
+          console.log(`[Worker ${workerId}] No documents in queue`);
           break;
         }
         
-        activeJobs++;
-        // Process document asynchronously
-        processDocument(documentId).catch(error => {
-          console.error("[Worker] Unhandled error in document processing:", error);
-          activeJobs--;
-        });
+        // Process each job in the batch
+        for (const job of jobs) {
+          activeJobs++;
+          processDocument(job).catch(error => {
+            console.error(`[Worker ${workerId}] Unhandled error in document processing:`, error);
+            activeJobs--;
+          });
+        }
       }
       
       // Wait before next polling cycle
       await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
     } catch (error) {
-      console.error("[Worker] Error in worker loop:", error);
+      console.error(`[Worker ${workerId}] Error in worker loop:`, error);
       await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL * 2));
     }
   }
