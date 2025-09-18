@@ -2,13 +2,14 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Send, Bot, User, Globe, HelpCircle, FileText } from "lucide-react"
+import { Send, Bot, User, Globe, HelpCircle, FileText, Mic, MicOff, Volume2, VolumeX } from "lucide-react"
+import { useVoice } from "@/hooks/useVoice"
 
 interface Message {
   id: string
@@ -47,7 +48,29 @@ export function ChatInterface() {
   const [inputText, setInputText] = useState("")
   const [selectedLanguage, setSelectedLanguage] = useState("en")
   const [isLoading, setIsLoading] = useState(false)
+  const [voiceEnabled, setVoiceEnabled] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Voice functionality
+  const handleTranscriptChange = useCallback((transcript: string) => {
+    setInputText(transcript)
+  }, [])
+
+  const {
+    transcript,
+    isListening,
+    hasRecognitionSupport,
+    startListening,
+    stopListening,
+    resetTranscript,
+    isSpeaking,
+    speak,
+    stopSpeaking,
+    hasSpeechSynthesis,
+  } = useVoice({ 
+    onTranscriptChange: handleTranscriptChange,
+    language: selectedLanguage 
+  })
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -56,6 +79,19 @@ export function ChatInterface() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Auto-speak bot responses if voice is enabled
+  useEffect(() => {
+    if (voiceEnabled && hasSpeechSynthesis && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage.sender === 'bot' && !isLoading) {
+        // Small delay to ensure message is rendered
+        setTimeout(() => {
+          speak(lastMessage.text, selectedLanguage)
+        }, 500)
+      }
+    }
+  }, [messages, voiceEnabled, hasSpeechSynthesis, speak, selectedLanguage, isLoading])
 
   const handleSendMessage = async (text: string = inputText) => {
     if (!text.trim()) return
@@ -126,6 +162,22 @@ export function ChatInterface() {
     }
   }
 
+  const handleVoiceInput = () => {
+    if (isListening) {
+      stopListening()
+    } else {
+      resetTranscript()
+      startListening()
+    }
+  }
+
+  const toggleVoiceOutput = () => {
+    if (isSpeaking) {
+      stopSpeaking()
+    }
+    setVoiceEnabled(!voiceEnabled)
+  }
+
   return (
     <div className="flex flex-col h-screen max-w-4xl mx-auto">
       {/* Header */}
@@ -142,6 +194,22 @@ export function ChatInterface() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Voice Controls */}
+            <div className="flex items-center gap-1">
+              {hasSpeechSynthesis && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleVoiceOutput}
+                  className={`w-8 h-8 p-0 ${voiceEnabled ? 'text-primary' : 'text-muted-foreground'}`}
+                  title={voiceEnabled ? 'Disable voice output' : 'Enable voice output'}
+                >
+                  {isSpeaking ? <VolumeX className="w-4 h-4" /> : 
+                   voiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                </Button>
+              )}
+            </div>
+            
             <Globe className="w-4 h-4 text-muted-foreground" />
             <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
               <SelectTrigger className="w-32">
@@ -270,20 +338,49 @@ export function ChatInterface() {
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder={`Type your message in ${languages.find((l) => l.code === selectedLanguage)?.native}...`}
-            className="flex-1"
-            disabled={isLoading}
+            placeholder={`${isListening ? 'Listening...' : `Type your message in ${languages.find((l) => l.code === selectedLanguage)?.native}...`}`}
+            className={`flex-1 ${isListening ? 'border-primary animate-pulse' : ''}`}
+            disabled={isLoading || isListening}
           />
-          <Button onClick={() => handleSendMessage()} disabled={!inputText.trim() || isLoading} size="icon">
+          
+          {/* Voice Input Button */}
+          {hasRecognitionSupport && (
+            <Button
+              variant={isListening ? "default" : "outline"}
+              size="icon"
+              onClick={handleVoiceInput}
+              disabled={isLoading}
+              className={`${isListening ? 'bg-red-500 hover:bg-red-600' : ''}`}
+              title={isListening ? 'Stop listening' : 'Start voice input'}
+            >
+              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </Button>
+          )}
+          
+          <Button 
+            onClick={() => handleSendMessage()} 
+            disabled={!inputText.trim() || isLoading || isListening} 
+            size="icon"
+          >
             <Send className="w-4 h-4" />
           </Button>
         </div>
 
         <div className="flex items-center justify-between mt-2">
-          <p className="text-xs text-muted-foreground">Press Enter to send, Shift+Enter for new line</p>
-          <Button variant="ghost" size="sm" className="text-xs">
-            Request Human Help
-          </Button>
+          <div className="flex items-center gap-4">
+            <p className="text-xs text-muted-foreground">Press Enter to send, Shift+Enter for new line</p>
+            {hasRecognitionSupport && (
+              <p className="text-xs text-muted-foreground">Click 🎤 for voice input</p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {isSpeaking && (
+              <span className="text-xs text-primary animate-pulse">Speaking...</span>
+            )}
+            <Button variant="ghost" size="sm" className="text-xs">
+              Request Human Help
+            </Button>
+          </div>
         </div>
       </div>
     </div>

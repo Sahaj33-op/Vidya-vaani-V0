@@ -1,33 +1,44 @@
 import { cacheKeyFor, initializeRedis, safeRedisGet, safeRedisSet } from '@/lib/redis-helpers';
 import crypto from 'crypto';
 
+// Create mock Redis instance
+const mockRedisInstance = {
+  get: jest.fn(),
+  set: jest.fn(),
+  setex: jest.fn(),
+};
+
 // Mock Redis client
-jest.mock('@upstash/redis', () => {
-  return {
-    Redis: jest.fn().mockImplementation(() => ({
-      get: jest.fn().mockImplementation((key) => Promise.resolve(`{"mocked":"data-for-${key}"}`)),
-      set: jest.fn().mockImplementation(() => Promise.resolve('OK')),
-      setex: jest.fn().mockImplementation(() => Promise.resolve('OK')),
-    })),
-  };
-});
+jest.mock('@upstash/redis', () => ({
+  Redis: jest.fn().mockImplementation(() => mockRedisInstance),
+}));
 
 // Mock crypto for deterministic tests
+const mockHashInstance = {
+  update: jest.fn().mockReturnThis(),
+  digest: jest.fn().mockReturnValue('mocked-hash'),
+};
+
 jest.mock('crypto', () => ({
-  createHash: jest.fn().mockImplementation(() => ({
-    update: jest.fn().mockReturnThis(),
-    digest: jest.fn().mockReturnValue('mocked-hash'),
-  })),
+  createHash: jest.fn().mockReturnValue(mockHashInstance),
 }));
 
 describe('Redis Helpers', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Setup default mock behaviors
+    mockRedisInstance.get.mockResolvedValue(`{"mocked":"data-for-test-key"}`);
+    mockRedisInstance.set.mockResolvedValue('OK');
+    mockRedisInstance.setex.mockResolvedValue('OK');
+  });
+
   describe('cacheKeyFor', () => {
     it('should normalize text and create a hashed key', () => {
       const result = cacheKeyFor('en', '  Test Message  ');
       
       // Verify text was normalized
       expect(crypto.createHash).toHaveBeenCalledWith('sha256');
-      expect(crypto.createHash('sha256').update).toHaveBeenCalledWith('test message');
+      expect(mockHashInstance.update).toHaveBeenCalledWith('test message');
       
       // Verify key format
       expect(result).toBe('chat:en:mocked-hash');
@@ -78,8 +89,6 @@ describe('Redis Helpers', () => {
 
   describe('safeRedisGet', () => {
     it('should handle JSON parsing of string results', async () => {
-      const { Redis } = require('@upstash/redis');
-      const mockRedisInstance = new Redis();
       mockRedisInstance.get.mockResolvedValueOnce('{"key":"value"}');
       
       const result = await safeRedisGet('test-key');
@@ -87,8 +96,6 @@ describe('Redis Helpers', () => {
     });
 
     it('should return non-JSON strings as is', async () => {
-      const { Redis } = require('@upstash/redis');
-      const mockRedisInstance = new Redis();
       mockRedisInstance.get.mockResolvedValueOnce('plain text');
       
       const result = await safeRedisGet('test-key');
@@ -96,8 +103,6 @@ describe('Redis Helpers', () => {
     });
 
     it('should handle Redis errors gracefully', async () => {
-      const { Redis } = require('@upstash/redis');
-      const mockRedisInstance = new Redis();
       mockRedisInstance.get.mockRejectedValueOnce(new Error('Redis error'));
       
       const result = await safeRedisGet('test-key');
@@ -107,9 +112,6 @@ describe('Redis Helpers', () => {
 
   describe('safeRedisSet', () => {
     it('should stringify objects before storing', async () => {
-      const { Redis } = require('@upstash/redis');
-      const mockRedisInstance = new Redis();
-      
       const testObject = { test: 'data' };
       await safeRedisSet('test-key', testObject, 60);
       
@@ -122,10 +124,8 @@ describe('Redis Helpers', () => {
     });
 
     it('should use set with ex option when setex is not available', async () => {
-      const { Redis } = require('@upstash/redis');
-      const mockRedisInstance = new Redis();
-      
       // Remove setex method to test fallback
+      const originalSetex = mockRedisInstance.setex;
       mockRedisInstance.setex = undefined;
       
       await safeRedisSet('test-key', 'test-value', 60);
@@ -136,11 +136,12 @@ describe('Redis Helpers', () => {
         'test-value', 
         { ex: 60 }
       );
+      
+      // Restore setex for other tests
+      mockRedisInstance.setex = originalSetex;
     });
 
     it('should handle Redis errors gracefully', async () => {
-      const { Redis } = require('@upstash/redis');
-      const mockRedisInstance = new Redis();
       mockRedisInstance.setex.mockRejectedValueOnce(new Error('Redis error'));
       
       const result = await safeRedisSet('test-key', 'test-value', 60);
