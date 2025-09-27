@@ -38,6 +38,7 @@
 - **Real-time Cache**: Redis-powered session management for performance.
 - **Monitoring**: Prometheus and Grafana for system observability.
 - **Cloud Ready**: Kubernetes deployment with auto-scaling capabilities.
+- **Modular Adapters**: Service adapter pattern for easy switching between demo and production modes
 
 ---
 
@@ -100,7 +101,7 @@ kubectl get pods -n vidya-vaani
 
 ```plaintext
 ┌────────────────────┐    ┌────────────────────┐    ┌────────────────────┐
-│     Next.js UI     │◄──►│     Flask API      │◄──►│     Rasa NLU       │
+│     Next.js UI     │◄──►│    FastAPI API     │◄──►│     Rasa NLU       │
 │    (Frontend)      │    │    (Backend)       │    │    (Intent)        │
 └────────────────────┘    └────────────────────┘    └────────────────────┘
          │                         │                         │
@@ -116,7 +117,7 @@ kubectl get pods -n vidya-vaani
 | **Component**       | **Technology**                          | **Purpose**                          |
 |---------------------|-----------------------------------------|--------------------------------------|
 | **Frontend**        | Next.js 14, TypeScript, Tailwind CSS    | Modern, responsive UI                |
-| **Backend**         | Flask, Python 3.11                     | API services and orchestration       |
+| **Backend**         | FastAPI, Python 3.11, Uvicorn          | High-performance API services        |
 | **NLU Engine**      | Rasa 3.x                               | Intent recognition and dialogue      |
 | **RAG System**      | SentenceTransformers, FAISS            | Document retrieval and search        |
 | **Translation**     | MarianMT, Language Detection           | Multi-language support               |
@@ -125,6 +126,18 @@ kubectl get pods -n vidya-vaani
 | **Deployment**      | Docker, Kubernetes, NGINX              | Container orchestration              |
 | **Monitoring**      | Prometheus, Grafana                    | System observability                 |
 
+### 🎯 **Service Adapter Pattern**
+
+The backend now uses a modular adapter pattern for all external services:
+
+- **LLM Service**: `MockLLMService` (demo) ↔ `GeminiLLMService` (production)
+- **Storage Service**: `LocalStorageService` (demo) ↔ `S3StorageService` (production)  
+- **Auth Service**: `MockAuthService` (demo) ↔ `SupabaseAuthService` (production)
+- **STT Service**: `MockSTTService` (demo) ↔ `RealSTTService` (production)
+- **OCR Service**: `MockOCRService` (demo) ↔ `RealOCRService` (production)
+
+Switch between modes using the `DEMO_MODE` environment variable.
+
 ---
 
 ## 📋 **API Documentation**
@@ -132,25 +145,27 @@ kubectl get pods -n vidya-vaani
 ### 🗨️ **Chat Endpoints**
 
 ```bash
-# Main chat interface
-POST /api/ask
+# Text chat interface
+POST /api/v1/chat/text
 {
-  "user_id": "string",
-  "text": "string",
-  "lang": "en|hi|mr|mwr"
+  "message": "string"
 }
 
+# Voice chat interface  
+POST /api/v1/chat/voice
+# Audio file upload
+
 # Document search
-POST /api/rag
+POST /api/v1/rag
 {
   "query": "string",
   "lang": "string"
 }
 
 # Translation service
-POST /api/translate
+POST /api/v1/translate
 {
-  "text": "string",
+  "text": "string", 
   "source_lang": "string",
   "target_lang": "string"
 }
@@ -160,10 +175,9 @@ POST /api/translate
 
 ```bash
 # Document management
-GET /api/admin/documents          # List all documents
-POST /api/admin/upload           # Upload new document
-GET /api/admin/stats             # System statistics
-GET /api/admin/handoffs          # Human handoff requests
+POST /api/v1/documents/upload     # Upload new document
+GET /api/v1/admin/stats          # System statistics (authenticated)
+GET /api/v1/admin/health         # Health check endpoint
 ```
 
 ---
@@ -220,11 +234,15 @@ GET /api/admin/handoffs          # Human handoff requests
 - [ ] **Admin Functions**: Test document upload and management.
 - [ ] **Error Handling**: Test network failures and invalid inputs.
 - [ ] **Performance**: Conduct load testing with concurrent users.
+- [ ] **Demo/Production Mode**: Test service adapter switching
 
 ### **Automated Testing**
 
 ```bash
-# Run test suite
+# Run backend test suite
+cd backend && pytest tests/
+
+# Run frontend test suite  
 npm run test
 
 # Test Rasa model
@@ -240,6 +258,28 @@ k6 run performance-tests.js
 
 <details>
 <summary><strong>🔴 Common Issues & Solutions</strong></summary>
+
+### **FastAPI Server Issues**
+
+```bash
+# Check FastAPI server
+cd backend && python -m uvicorn app.main:app --reload
+
+# Test health endpoint
+curl http://localhost:8000/api/v1/admin/health
+```
+
+### **Service Adapter Configuration**
+
+```bash
+# Check DEMO_MODE setting
+echo $DEMO_MODE
+
+# Verify environment variables
+echo $GEMINI_API_KEY
+echo $SUPABASE_URL
+echo $S3_BUCKET_NAME
+```
 
 ### **Redis Connection Issues**
 
@@ -315,6 +355,7 @@ We welcome contributions to enhance **Vidya Vaani**! Follow our contribution gui
    ```bash
    # Make your changes
    npm run test
+   cd backend && pytest tests/
    docker-compose -f docker-compose.dev.yml up --build
    ```
 
@@ -382,4 +423,3 @@ This project is licensed under the **[MIT License](LICENSE)**.
 [![Follow](https://img.shields.io/github/followers/sahaj33-op?style=social)](https://github.com/sahaj33-op)
 
 </div>
-```
