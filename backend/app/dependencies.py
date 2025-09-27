@@ -1,9 +1,12 @@
+from typing import Union
 from app.core.config import settings
 from app.services.llm_service import LLMService, MockLLMService, GeminiLLMService
-from app.services.storage_service import StorageService, LocalStorageService, S3StorageService
+from app.services.storage_service import StorageService, LocalStorageService, S3StorageService, SupabaseStorageAdapter
 from app.services.stt_service import STTService, MockSTTService, RealSTTService
 from app.services.ocr_service import OCRService, MockOCRService, RealOCRService
 from app.core.security import AuthService, MockAuthService, SupabaseAuthService
+from retriever.vector_store import FAISSVectorStore, SupabaseVectorStore
+from retriever.embeddings import EmbeddingService
 
 def get_llm_service() -> LLMService:
     if settings.DEMO_MODE:
@@ -13,7 +16,7 @@ def get_llm_service() -> LLMService:
 def get_storage_service() -> StorageService:
     if settings.DEMO_MODE:
         return LocalStorageService(storage_path="./local_storage")
-    return S3StorageService()
+    return SupabaseStorageAdapter()
 
 def get_stt_service() -> STTService:
     if settings.DEMO_MODE:
@@ -29,3 +32,8 @@ def get_auth_service() -> AuthService:
     if settings.DEMO_MODE:
         return MockAuthService()
     return SupabaseAuthService()
+
+def get_vector_store(embedding_service: EmbeddingService) -> Union[FAISSVectorStore, SupabaseVectorStore]:
+    if settings.DEMO_MODE:
+        return FAISSVectorStore(embedding_service=embedding_service)
+    return SupabaseVectorStore(embedding_service=embedding_service)

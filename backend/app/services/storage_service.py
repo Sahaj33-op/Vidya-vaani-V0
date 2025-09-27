@@ -2,6 +2,7 @@ import os
 from abc import ABC, abstractmethod
 from typing import List
 from app.core.config import settings
+from supabase import create_client, Client
 
 class StorageService(ABC):
     @abstractmethod
@@ -39,3 +40,26 @@ class S3StorageService(StorageService):
             return []
         # Placeholder for actual S3 list files logic
         return [f"s3_{self.bucket_name}_file1.txt", f"s3_{self.bucket_name}_file2.txt"]
+
+class SupabaseStorageAdapter(StorageService):
+    def __init__(self):
+        self.supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+        self.bucket_name = "documents" # You might want to make this configurable
+        try:
+            self.supabase.storage.get_bucket(self.bucket_name)
+        except Exception:
+            self.supabase.storage.create_bucket(self.bucket_name)
+
+    def upload_file(self, file_name: str, file_content: bytes) -> str:
+        try:
+            self.supabase.storage.from_(self.bucket_name).upload(file_name, file_content)
+            return f"File {file_name} uploaded to Supabase Storage bucket {self.bucket_name}"
+        except Exception as e:
+            raise Exception(f"Error uploading file to Supabase Storage: {e}")
+
+    def list_files(self) -> List[str]:
+        try:
+            res = self.supabase.storage.from_(self.bucket_name).list()
+            return [file['name'] for file in res]
+        except Exception as e:
+            raise Exception(f"Error listing files from Supabase Storage: {e}")

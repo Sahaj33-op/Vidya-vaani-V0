@@ -1,8 +1,3 @@
-"""
-Vector store implementation using FAISS for document retrieval
-Supports both local FAISS and Chroma vector databases
-"""
-
 import os
 import json
 import pickle
@@ -16,6 +11,9 @@ import logging
 import shutil
 import tempfile
 import uuid
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+from app.core.config import settings
 
 # Cross-platform file locking
 if platform.system() == 'Windows':
@@ -239,12 +237,12 @@ class FAISSVectorStore:
                         self.chunks = pickle.load(f)
                     
                     # Load metadata
-                with open(metadata_file, 'r') as f:
-                    self.chunk_metadata = json.load(f)
-                    # Convert string keys back to int
-                    self.chunk_metadata = {int(k): v for k, v in self.chunk_metadata.items()}
-                
-                logger.info(f"Loaded index from {self.index_path} with {len(self.chunks)} chunks")
+                    with open(metadata_file, 'r') as f:
+                        self.chunk_metadata = json.load(f)
+                        # Convert string keys back to int
+                        self.chunk_metadata = {int(k): v for k, v in self.chunk_metadata.items()}
+                    
+                    logger.info(f"Loaded index from {self.index_path} with {len(self.chunks)} chunks")
                 finally:
                     # Release lock
                     unlock_file(lock_f)
@@ -253,3 +251,99 @@ class FAISSVectorStore:
             self.index = None
             self.chunks = []
             self.chunk_metadata = {}
+
+class SupabaseVectorStore:
+    """Supabase Postgres-based vector store for document retrieval using pgvector"""
+
+    def __init__(self, embedding_service: EmbeddingService):
+        self.embedding_service = embedding_service
+        # Construct the database URL for Supabase
+        # The SUPABASE_URL is typically like https://<project_ref>.supabase.co
+        # The direct postgres connection string needs to be constructed from this.
+        # Example: postgresql://postgres:[YOUR-SERVICE-KEY]@db.<project_ref>.supabase.co:5432/postgres
+        project_ref = settings.SUPABASE_URL.split('//')[1].split('.')[0]
+        self.db_url = (
+            f"postgresql://postgres:{settings.SUPABASE_SERVICE_KEY}"
+            f"@db.{project_ref}.supabase.co:5432/postgres"
+        )
+        
+        self.engine = create_engine(self.db_url)
+        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        self._create_tables_if_not_exist() # Ensure tables exist
+
+    def _create_tables_if_not_exist(self):
+        # This is a simplified approach. In a real app, you'd use migrations.
+        with self.engine.connect() as connection:
+            connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            connection.execute(text("""
+                CREATE TABLE IF NOT EXISTS documents (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    content TEXT NOT NULL,
+                    metadata JSONB,
+                    embedding vector(384)
+                );
+            """))
+            connection.commit()
+
+    def add_documents(self, chunks: List[DocumentChunk]) -> None:
+        if not chunks:
+            logger.warning("No chunks provided to add")
+            return
+
+        logger.info(f"Adding {len(chunks)} chunks to Supabase vector store")
+
+        texts = [chunk.text for chunk in chunks]
+        embeddings = self.embedding_service.encode_texts(texts)
+
+        with self.SessionLocal() as session:
+            for i, chunk in enumerate(chunks):
+                embedding_list = embeddings[i].tolist()
+                session.execute(
+                    text("INSERT INTO documents (content, metadata, embedding) VALUES (:content, :metadata, :embedding)"),
+                    {"content": chunk.text, "metadata": chunk.metadata, "embedding": embedding_list}
+                )
+            session.commit()
+        logger.info(f"Added {len(chunks)} chunks to Supabase vector store.")
+
+    def search(self, query: str, top_k: int = 5, score_threshold: float = 0.0) -> List[Dict[str, Any]]:
+        logger.info(f"Searching Supabase vector store for query: {query[:50]}...")
+
+        query_embedding = self.embedding_service.encode_query(query).tolist()
+
+        with self.SessionLocal() as session:
+            # Using pgvector's cosine distance operator (<=>)
+            # Note: pgvector returns distance, so lower is better.
+            # We need to convert it to similarity score (1 - distance)
+            results = session.execute(
+                text(f"""
+                    SELECT content, metadata, 1 - (embedding <=> :query_embedding) AS similarity_score
+                    FROM documents
+                    ORDER BY embedding <=> :query_embedding
+                    LIMIT :top_k;
+                """
+                ),
+                {"query_embedding": query_embedding, "top_k": top_k}
+            ).fetchall()
+
+            formatted_results = []
+            for row in results:
+                score = row.similarity_score
+                if score >= score_threshold:
+                    formatted_results.append({
+                        'chunk': DocumentChunk(text=row.content, doc_id=row.metadata.get('doc_id'), chunk_id=row.metadata.get('chunk_id'), metadata=row.metadata),
+                        'score': float(score),
+                        'text': row.content,
+                        'doc_id': row.metadata.get('doc_id'),
+                        'chunk_id': row.metadata.get('chunk_id'),
+                        'metadata': row.metadata
+                    })
+            logger.info(f"Found {len(formatted_results)} results for query: {query[:50]}...")
+            return formatted_results
+
+    def get_stats(self) -> Dict[str, Any]:
+        with self.SessionLocal() as session:
+            total_chunks = session.execute(text("SELECT COUNT(*) FROM documents")).scalar()
+            return {
+                'total_chunks': total_chunks,
+                'embedding_dimension': self.embedding_service.get_embedding_dimension(),
+            }

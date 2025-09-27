@@ -6,3 +6,6 @@ pytest
 httpx
 pydantic-settings
 python-multipart
+supabase
+psycopg2-binary
+sqlalchemy-utils

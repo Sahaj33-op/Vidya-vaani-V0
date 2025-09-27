@@ -29,7 +29,7 @@
 - **Human Handoff**: Smart escalation to human volunteers when needed.
 
 ### 📚 **Knowledge Base**
-- **RAG System**: Advanced document retrieval using FAISS and SentenceTransformers.
+- **RAG System**: Advanced document retrieval using Supabase-backed pgvector and SentenceTransformers (production) or FAISS (demo).
 - **Smart Search**: Semantic search with efficient document chunking.
 - **Admin Dashboard**: Intuitive interface for document management and uploads.
 
@@ -117,12 +117,12 @@ kubectl get pods -n vidya-vaani
 | **Component**       | **Technology**                          | **Purpose**                          |
 |---------------------|-----------------------------------------|--------------------------------------|
 | **Frontend**        | Next.js 14, TypeScript, Tailwind CSS    | Modern, responsive UI                |
-| **Backend**         | FastAPI, Python 3.11, Uvicorn          | High-performance API services        |
+| **Backend**         | FastAPI, Python 3.11, Uvicorn, Supabase| High-performance API services        |
 | **NLU Engine**      | Rasa 3.x                               | Intent recognition and dialogue      |
 | **RAG System**      | SentenceTransformers, FAISS            | Document retrieval and search        |
 | **Translation**     | MarianMT, Language Detection           | Multi-language support               |
 | **Cache**           | Redis (Upstash)                        | Session management and caching       |
-| **Database**        | Upstash Search                         | Document indexing and storage        |
+| **Database**        | Supabase Postgres (pgvector)           | Document indexing and storage        |
 | **Deployment**      | Docker, Kubernetes, NGINX              | Container orchestration              |
 | **Monitoring**      | Prometheus, Grafana                    | System observability                 |
 
@@ -131,8 +131,9 @@ kubectl get pods -n vidya-vaani
 The backend now uses a modular adapter pattern for all external services:
 
 - **LLM Service**: `MockLLMService` (demo) ↔ `GeminiLLMService` (production)
-- **Storage Service**: `LocalStorageService` (demo) ↔ `S3StorageService` (production)  
+- **Storage Service**: `LocalStorageService` (demo) ↔ `SupabaseStorageAdapter` (production)  
 - **Auth Service**: `MockAuthService` (demo) ↔ `SupabaseAuthService` (production)
+- **Vector Store**: `FAISSVectorStore` (demo) ↔ `SupabaseVectorStore` (production)
 - **STT Service**: `MockSTTService` (demo) ↔ `RealSTTService` (production)
 - **OCR Service**: `MockOCRService` (demo) ↔ `RealOCRService` (production)
 
@@ -278,6 +279,8 @@ echo $DEMO_MODE
 # Verify environment variables
 echo $GEMINI_API_KEY
 echo $SUPABASE_URL
+echo $SUPABASE_ANON_KEY
+echo $SUPABASE_SERVICE_KEY
 echo $S3_BUCKET_NAME
 ```
 
