@@ -1,0 +1,49 @@
+{
+  "tech_stack": [
+    "Python",
+    "TypeScript",
+    "FastAPI",
+    "Next.js",
+    "Rasa",
+    "Supabase",
+    "Redis",
+    "Docker",
+    "Kubernetes",
+    "Uvicorn",
+    "shadcn/ui"
+  ],
+  "features": [
+    {
+      "name": "Chat Text API",
+      "description": "Handles text-based chat interactions, including language detection, translation, NLU, RAG, and LLM response generation.",
+      "files": [
+        "backend/app/api/v1/endpoints/chat.py"
+      ],
+      "api_doc": {}
+    },
+    {
+      "name": "Chat Voice API",
+      "description": "Handles voice-based chat interactions, transcribing audio and then processing it via the Chat Text API.",
+      "files": [
+        "backend/app/api/v1/endpoints/chat.py"
+      ],
+      "api_doc": {}
+    },
+    {
+      "name": "Documents API",
+      "description": "Manages document-related operations (e.g., upload, list, delete).",
+      "files": [
+        "backend/app/api/v1/endpoints/documents.py"
+      ],
+      "api_doc": {}
+    },
+    {
+      "name": "Admin API",
+      "description": "Provides administrative functionalities for the application.",
+      "files": [
+        "backend/app/api/v1/endpoints/admin.py"
+      ],
+      "api_doc": {}
+    }
+  ]
+}

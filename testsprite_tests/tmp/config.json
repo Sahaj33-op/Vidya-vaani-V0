@@ -1,0 +1,16 @@
+{
+  "status": "init",
+  "type": "backend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:8000",
+  "backendAuthType": "public",
+  "executionArgs": {
+    "projectName": "Vidya vaani V0",
+    "projectPath": "f:\\Sahaj\\Python\\Vidya Vaani\\Vidya vaani V0",
+    "testIds": [],
+    "additionalInstruction": "",
+    "envs": {
+      "API_KEY": "sk-user-Bw8Je2JHHJ1lKDVmz1-FyOD52ysfVfBXau75ObhKsCc__6f2OsbGOBnqjLcJ6Kee7pWulUo4xXcNKXeLZecFlPMrUUBdnL5QtAFtkhNNpeTbBfEH3nRkECMaMC1AN8ZY6m0"
+    }
+  }
+}
