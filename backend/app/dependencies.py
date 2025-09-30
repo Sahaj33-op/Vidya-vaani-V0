@@ -1,10 +1,13 @@
 from typing import Union
 from app.core.config import settings
-from app.services.llm_service import LLMService, MockLLMService, GeminiLLMService
-from app.services.storage_service import StorageService, LocalStorageService, S3StorageService, SupabaseStorageAdapter
-from app.services.stt_service import STTService, MockSTTService, RealSTTService
-from app.services.ocr_service import OCRService, MockOCRService, RealOCRService
-from app.core.security import AuthService, MockAuthService, SupabaseAuthService
+from app.services.llm_service import MockLLMService, GeminiLLMService
+from app.services.storage_service import MockStorageService, S3StorageService
+from app.services.auth_service import MockAuthService, SupabaseAuthService
+from app.services.stt_service import MockSTTService, RealSTTService
+from app.services.ocr_service import MockOCRService, RealOCRService
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from retriever.vector_store import FAISSVectorStore, SupabaseVectorStore
 from retriever.embeddings import EmbeddingService
 

@@ -1,24 +1,5 @@
 import { IndexingQueue, IndexingJob } from "../lib/queue";
-import {      const batchId = `batch_${batchIndex}_${Date.now()}`;
-      
-      try {
-        // Track batch progress
-        await progress.trackBatch(job.jobId, batchId, i, i + batchChunks.length - 1, chunks.length);
-        
-        // Process batch
-        await processBatch(job, batchChunks, batchIndex, totalBatches, { title, filename });
-        
-        // Mark batch as completed and update progress
-        await progress.completeBatch(job.jobId, batchId);
-        
-        console.log(`[Worker] Processed batch ${batchIndex + 1}/${totalBatches} for document ${job.docId}`);
-      } catch (error) {
-        console.error(`[Worker] Error processing batch ${batchIndex + 1}:`, error);
-        
-        // Mark batch as failed but continue with next batch
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        await progress.completeBatch(job.jobId, batchId, errorMessage);
-      }safeRedisGet, safeRedisSet } from "../lib/redis-helpers";
+import { safeRedisGet, safeRedisSet, initializeRedis } from "../lib/redis-helpers";
 import { processBatch } from "./batch-processor";
 import { ProgressTracker } from "../lib/progress-tracker";
 import { v4 as uuidv4 } from "uuid";
@@ -72,35 +53,27 @@ async function processDocument(job: IndexingJob): Promise<void> {
     for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
       const batchChunks = chunks.slice(i, i + BATCH_SIZE);
       const batchIndex = Math.floor(i / BATCH_SIZE);
-      
+      const batchId = `batch_${batchIndex}_${Date.now()}`;
+
       try {
-        // Process batch concurrently
-        await processBatch(
-          job,
-          batchChunks,
-          batchIndex,
-          totalBatches,
-          { title, filename }
-        );
-        
-        processed += batchChunks.length;
-        
         // Track batch progress
-        const batchId = `batch_${batchIndex}_${Date.now()}`;
         await progress.trackBatch(job.jobId, batchId, i, i + batchChunks.length - 1, chunks.length);
-        
+
         // Process batch
         await processBatch(job, batchChunks, batchIndex, totalBatches, { title, filename });
-        
+
+        processed += batchChunks.length;
+
         // Mark batch as completed and update progress
         await progress.completeBatch(job.jobId, batchId);
-        
+
         console.log(`[Worker] Processed batch ${batchIndex + 1}/${totalBatches} for document ${job.docId}`);
       } catch (batchError) {
         console.error(`[Worker] Error processing batch ${batchIndex + 1}:`, batchError);
-        
+
         // Mark batch as failed but continue with next batch
-        await progress.completeBatch(job.jobId, batchId, batchError.message);
+        const errorMessage = batchError instanceof Error ? batchError.message : String(batchError);
+        await progress.completeBatch(job.jobId, batchId, errorMessage);
       }
     }
     

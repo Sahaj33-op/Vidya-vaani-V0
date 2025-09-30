@@ -144,7 +144,7 @@ export class AtomicOperations {
     return this.lockManager.withLock(
       key,
       async () => {
-        const current = await safeRedisGet<T>(key);
+        const current = await safeRedisGet(key);
         const updated = await updateFn(current);
         await this.redis.set(key, JSON.stringify(updated));
         return updated;

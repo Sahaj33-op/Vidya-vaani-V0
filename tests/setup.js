@@ -80,6 +80,8 @@ global.SpeechSynthesisUtterance = jest.fn().mockImplementation((text) => ({
   onboundary: null,
 }))
 
+
+
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
   constructor() {}

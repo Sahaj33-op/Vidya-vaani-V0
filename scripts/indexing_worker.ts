@@ -5,11 +5,7 @@ import { getStorageProvider } from '../lib/storage';
 import { safeRedisGet, safeRedisSet } from '../lib/redis-helpers';
 import fs from 'fs';
 import path from 'path';
-import dotenv from 'dotenv';
 import { execSync } from 'child_process';
-
-// Load environment variables
-dotenv.config();
 
 // Configuration
 const POLLING_INTERVAL = 1000; // 1 second
@@ -158,7 +154,7 @@ async function processDocument(job: any): Promise<void> {
   
   try {
     // Update document status
-    await safeRedisSet(`document:${docId}`, { status: 'processing' }, true);
+    await safeRedisSet(`document:${docId}`, { status: 'processing' }, 86400);
     
     // Retrieve document from storage
     const content = await storage.readFile(storagePath);
@@ -225,7 +221,7 @@ async function processDocument(job: any): Promise<void> {
         chunks: chunks.length,
         indexedAt: new Date().toISOString()
       };
-      await safeRedisSet(`document:${docId}`, updatedDoc);
+      await safeRedisSet(`document:${docId}`, updatedDoc, 86400);
     }
     
     // Mark job as complete
@@ -240,11 +236,11 @@ async function processDocument(job: any): Promise<void> {
     console.error(`[Worker] Error processing document ${docId}:`, error);
     
     // Update document status
-    await safeRedisSet(`document:${docId}`, { status: 'failed' }, true);
+    await safeRedisSet(`document:${docId}`, { status: 'failed' }, 86400);
     
     // Mark job as failed
     await queue.fail(job.jobId, {
-      error: error.message || 'Unknown error',
+      error: error instanceof Error ? error.message : 'Unknown error',
       docId
     });
   }
@@ -259,18 +255,20 @@ async function workerLoop() {
   try {
     // Check if we can process more jobs
     if (activeJobs < MAX_CONCURRENT_JOBS) {
-      // Dequeue a job
-      const job = await queue.dequeue();
+      // Dequeue jobs
+      const jobs = await queue.dequeue('indexing_worker');
       
-      if (job) {
-        activeJobs++;
-        console.log(`[Worker] Dequeued job ${job.jobId} for document ${job.docId}`);
-        
-        // Process the job
-        processDocument(job)
-          .finally(() => {
-            activeJobs--;
-          });
+      if (jobs && jobs.length > 0) {
+        activeJobs += jobs.length;
+        for (const job of jobs) {
+          console.log(`[Worker] Dequeued job ${job.jobId} for document ${job.docId}`);
+          
+          // Process the job
+          processDocument(job)
+            .finally(() => {
+              activeJobs--;
+            });
+        }
       }
     }
   } catch (error) {

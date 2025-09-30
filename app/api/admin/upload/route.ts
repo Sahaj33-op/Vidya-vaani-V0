@@ -72,8 +72,11 @@ export async function POST(request: NextRequest) {
     const fileExtension = path.extname(file.name)
     const storagePath = `documents/${docId}${fileExtension}`
     
+    // Create Blob for storage
+    const fileBlob = new Blob([fileContent], { type: file.type })
+    
     // Save file to storage
-    await storage.saveFile(storagePath, fileContent)
+    await storage.saveFile(fileBlob, storagePath)
     console.log(`[v0] File saved to storage at: ${storagePath}`)
 
     // Create document metadata (without content)

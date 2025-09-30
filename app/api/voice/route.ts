@@ -16,6 +16,7 @@ interface VoiceResponse {
   confidence?: number
   method: string
   error?: string
+  message?: string
 }
 
 export async function POST(request: NextRequest) {
@@ -112,8 +113,8 @@ async function handleSynthesis(text?: string, language: string = 'en'): Promise<
     
     const response: VoiceResponse = {
       success: true,
-      text: text,
-      language: language,
+      language_detected: language,
+      confidence: 1.0,
       method: "browser_speech_synthesis",
       message: "Use browser's speechSynthesis API for text-to-speech"
     }

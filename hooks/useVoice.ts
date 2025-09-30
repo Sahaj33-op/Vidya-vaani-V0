@@ -79,7 +79,7 @@ export const useVoice = ({ onTranscriptChange, language = 'en-US' }: UseVoicePro
     window.speechSynthesis.cancel()
 
     const utterance = new SpeechSynthesisUtterance(text)
-    
+
     // Language mapping for speech synthesis
     const synthLanguageMap: Record<string, string> = {
       'en': 'en-US',
@@ -91,30 +91,73 @@ export const useVoice = ({ onTranscriptChange, language = 'en-US' }: UseVoicePro
     const synthLanguage = voiceLanguage || language
     utterance.lang = synthLanguageMap[synthLanguage] || 'en-US'
 
-    // Try to find a suitable voice
+    // Function to set voice and speak
+    const setVoiceAndSpeak = () => {
+      const voices = window.speechSynthesis.getVoices()
+
+      // Try to find a suitable voice for the target language
+      let preferredVoice = voices.find(voice =>
+        voice.lang === utterance.lang
+      )
+
+      // If exact match not found, try partial match (language prefix)
+      if (!preferredVoice) {
+        preferredVoice = voices.find(voice =>
+          voice.lang.startsWith(utterance.lang.split('-')[0])
+        )
+      }
+
+      // If still no voice found, try any voice that supports the language
+      if (!preferredVoice) {
+        preferredVoice = voices.find(voice =>
+          voice.lang.includes(utterance.lang.split('-')[0])
+        )
+      }
+
+      if (preferredVoice) {
+        utterance.voice = preferredVoice
+        console.log(`Using voice: ${preferredVoice.name} (${preferredVoice.lang})`)
+      } else {
+        console.warn(`No suitable voice found for ${utterance.lang}, using default`)
+      }
+
+      // Set speech parameters
+      utterance.rate = 0.9
+      utterance.pitch = 1
+      utterance.volume = 1
+
+      // Event handlers
+      utterance.onstart = () => setIsSpeaking(true)
+      utterance.onend = () => setIsSpeaking(false)
+      utterance.onerror = (event) => {
+        console.error('Speech synthesis error:', event.error)
+        setIsSpeaking(false)
+      }
+
+      window.speechSynthesis.speak(utterance)
+    }
+
+    // Check if voices are already loaded
     const voices = window.speechSynthesis.getVoices()
-    const preferredVoice = voices.find(voice => 
-      voice.lang.startsWith(utterance.lang.split('-')[0])
-    )
-    
-    if (preferredVoice) {
-      utterance.voice = preferredVoice
+    if (voices.length > 0) {
+      // Voices are already loaded, proceed immediately
+      setVoiceAndSpeak()
+    } else {
+      // Wait for voices to be loaded
+      const handleVoicesChanged = () => {
+        window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged)
+        setVoiceAndSpeak()
+      }
+
+      window.speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged)
+
+      // Fallback timeout in case voiceschanged never fires
+      setTimeout(() => {
+        window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged)
+        console.warn('Voice loading timeout, proceeding with available voices')
+        setVoiceAndSpeak()
+      }, 2000)
     }
-
-    // Set speech parameters
-    utterance.rate = 0.9
-    utterance.pitch = 1
-    utterance.volume = 1
-
-    // Event handlers
-    utterance.onstart = () => setIsSpeaking(true)
-    utterance.onend = () => setIsSpeaking(false)
-    utterance.onerror = (event) => {
-      console.error('Speech synthesis error:', event.error)
-      setIsSpeaking(false)
-    }
-
-    window.speechSynthesis.speak(utterance)
   }, [hasSpeechSynthesis, language])
 
   const stopSpeaking = useCallback(() => {
