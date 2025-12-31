@@ -1093,7 +1093,13 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ## 🌟 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=sahaj33-op/vidya-vaani-v0&type=Date)](https://star-history.com/#sahaj33-op/vidya-vaani-v0&Date)
+<a href="https://www.star-history.com/#sahaj33-op/vidya-vaani-v0&type=date&legend=bottom-right">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=sahaj33-op/vidya-vaani-v0&type=date&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=sahaj33-op/vidya-vaani-v0&type=date&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=sahaj33-op/vidya-vaani-v0&type=date&legend=bottom-right" />
+ </picture>
+</a>
 
 ---
 
