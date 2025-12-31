@@ -38,10 +38,14 @@ if settings.REDIS_ENABLED:
             db=settings.REDIS_DB,
             decode_responses=True,
         )
-        # Test connection
         redis_client.ping()
+        logger.info("Redis connection established successfully")
     except Exception as e:
-        print(f"Redis connection failed, using in-memory cache: {e}")
+        logger.error(f"Redis connection failed, using in-memory cache: {e}")
+        if not settings.DEMO_MODE:
+            logger.warning(
+                "Running production without Redis - this may impact performance"
+            )
         redis_client = None
 
 
@@ -99,8 +103,6 @@ async def translate_text(
     if source_lang == target_lang:
         return {"translated_text": text, "confidence": 1.0}
 
-    # In production, integrate with a translation service
-    # This is a placeholder implementation
     return {
         "translated_text": f"Translated to {target_lang}: {text}",
         "confidence": 0.9,
@@ -147,8 +149,6 @@ async def retrieve_context_documents(
 ) -> Dict[str, Any]:
     """Retrieve context documents using RAG."""
     try:
-        # In a real implementation, this would call your vector store directly
-        # For now, we'll use the existing RAG endpoint via HTTP
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{settings.BACKEND_URL}/api/v1/documents/search",

@@ -1,7 +1,9 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import chat, documents, admin, rag, translation
+
+from app.api.v1.endpoints import admin, chat, documents, health, rag, translation
 
 api_router = APIRouter()
+api_router.include_router(health.router, tags=["health"])
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
