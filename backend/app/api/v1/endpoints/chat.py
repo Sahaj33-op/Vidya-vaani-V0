@@ -6,7 +6,8 @@ from app.api.models.chat import ChatRequest, ChatResponse, RetrievedDocument
 from app.services.llm_service import LLMService
 from app.services.stt_service import STTService
 from app.services.rag_service import RAGService
-from app.dependencies import get_llm_service, get_stt_service, get_rasa_service, get_rag_service
+from app.services.translation_service import TranslationService, TranslationHelper
+from app.dependencies import get_llm_service, get_stt_service, get_rasa_service, get_rag_service, get_translation_service
 from app.core.config import settings
 from typing import List, Dict, Any, Optional
 import json
@@ -185,7 +186,8 @@ async def generate_static_response(intent: str, lang: str) -> ChatResponse:
 async def chat_text(
     request: ChatRequest,
     llm_service: LLMService = Depends(get_llm_service),
-    rag_service: RAGService = Depends(get_rag_service)
+    rag_service: RAGService = Depends(get_rag_service),
+    translation_service: TranslationService = Depends(get_translation_service)
 ):
     """Process text chat requests with full orchestration."""
     try:
@@ -195,17 +197,13 @@ async def chat_text(
         if cached_response:
             return ChatResponse(**json.loads(cached_response))
 
-        # Language detection and translation to English
-        language_info = await detect_language(request.message)
-        english_text = language_info["processed_text"]
-        original_language = language_info["detected_language"]
-        translated_to_english = False
+        # Use the new translation service for language detection and translation
+        translation_helper = TranslationHelper(translation_service)
+        query_info = translation_helper.process_multilingual_query(request.message)
 
-        if language_info["translation_needed"] and original_language != 'en':
-            translation_result = await translate_text(english_text, original_language, 'en')
-            if translation_result["confidence"] > 0.5:
-                english_text = translation_result["translated_text"]
-                translated_to_english = True
+        english_text = query_info['english_query']
+        original_language = query_info['detected_language']
+        needs_translation = query_info['needs_response_translation']
 
         # Get intent and entities from Rasa NLU (skip in demo mode)
         intent = "general_query"
@@ -239,21 +237,22 @@ async def chat_text(
             # Generate response using LLM with RAG context
             llm_response = llm_service.generate_response(english_text, context)
 
+            # Translate response back to original language if needed
+            final_response = llm_response
+            if needs_translation:
+                translated, _ = translation_helper.translate_response_to_original(
+                    llm_response, original_language
+                )
+                final_response = translated
+
             response = ChatResponse(
-                reply=llm_response,
+                reply=final_response,
                 source_ids=source_ids,
                 action="answer:llm" if context else "answer:llm_no_context",
-                translated=translated_to_english,
+                translated=needs_translation,
                 original_language=original_language,
-                confidence=0.8 if context else 0.5
+                confidence=query_info['confidence'] if context else 0.5
             )
-
-        # Translate response back to original language if needed
-        if translated_to_english and response.reply:
-            translation_result = await translate_text(response.reply, 'en', original_language)
-            if translation_result["confidence"] > 0.5:
-                response.reply = translation_result["translated_text"]
-                response.translated = True
 
         # Cache the response
         cache_set(cache_key, json.dumps(response.model_dump()))
@@ -267,7 +266,8 @@ async def chat_voice(
     audio_file: UploadFile = File(...),
     stt_service: STTService = Depends(get_stt_service),
     llm_service: LLMService = Depends(get_llm_service),
-    rag_service: RAGService = Depends(get_rag_service)
+    rag_service: RAGService = Depends(get_rag_service),
+    translation_service: TranslationService = Depends(get_translation_service)
 ):
     """Process voice chat requests."""
     try:
@@ -276,6 +276,6 @@ async def chat_voice(
 
         # Create a ChatRequest and process it through the text endpoint logic
         request = ChatRequest(message=transcribed_text)
-        return await chat_text(request, llm_service, rag_service)
+        return await chat_text(request, llm_service, rag_service, translation_service)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing voice request: {str(e)}")
