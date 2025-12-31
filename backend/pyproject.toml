@@ -1,0 +1,45 @@
+# Pytest Configuration for Vidya Vaani Backend
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",                       # Verbose output
+    "--strict-markers",         # Strict marker validation
+    "--tb=short",              # Short traceback format
+    "--disable-warnings",       # Disable warnings in output
+    "-ra",                     # Show summary of all test outcomes
+]
+
+# Test markers
+markers = [
+    "unit: Unit tests for individual components",
+    "integration: Integration tests for API endpoints",
+    "e2e: End-to-end tests",
+    "slow: Tests that take significant time",
+    "rag: Tests for RAG system",
+    "llm: Tests that require LLM API",
+    "translation: Tests for translation service",
+]
+
+# Coverage settings (optional)
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
