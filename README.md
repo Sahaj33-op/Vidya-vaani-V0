@@ -945,7 +945,7 @@ We welcome contributions! Please follow these guidelines:
 1. **Fork & Clone**
    ```bash
    git fork https://github.com/sahaj33-op/vidya-vaani-v0
-   git clone https://github.com/YOUR_USERNAME/vidya-vaani-v0
+   git clone https://github.com/sahaj33-op/vidya-vaani-v0
    cd vidya-vaani-v0
    ```
 
