@@ -7,6 +7,7 @@ from app.services.stt_service import STTService, MockSTTService, RealSTTService
 from app.services.ocr_service import OCRService, MockOCRService, RealOCRService
 from app.services.rasa_service import RasaNLUService, MockRasaNLUService
 from app.services.rag_service import RAGService, MockRAGService, FAISSRAGService
+from app.services.translation_service import TranslationService, MockTranslationService, LangdetectTranslationService
 
 def get_llm_service() -> LLMService:
     if settings.DEMO_MODE:
@@ -71,6 +72,23 @@ def get_rag_service() -> RAGService:
             _rag_service_instance = FAISSRAGService()
 
     return _rag_service_instance
+
+
+# Singleton instance for Translation service
+_translation_service_instance: Optional[TranslationService] = None
+
+
+def get_translation_service() -> TranslationService:
+    """Get translation service - uses singleton pattern."""
+    global _translation_service_instance
+
+    if _translation_service_instance is None:
+        if settings.DEMO_MODE:
+            _translation_service_instance = MockTranslationService()
+        else:
+            _translation_service_instance = LangdetectTranslationService()
+
+    return _translation_service_instance
 
 
 class MockVectorStore:

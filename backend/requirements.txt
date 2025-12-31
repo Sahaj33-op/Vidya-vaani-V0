@@ -13,3 +13,9 @@ google-generativeai
 sentence-transformers
 faiss-cpu
 numpy
+# Document parsing
+pdfplumber
+PyPDF2
+python-docx
+# Language detection and translation
+langdetect
