@@ -1,45 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { safeRedisSet } from "@/lib/redis-helpers"
-import { IndexingQueue } from "@/lib/queue"
-import { getStorageProvider } from "@/lib/storage"
-import path from "path"
-import { v4 as uuidv4 } from "uuid"
 import { requireAuth } from "@/lib/auth"
-import { createHash } from 'crypto'
-
-const indexingQueue = new IndexingQueue()
-const storage = getStorageProvider()
-
-async function validateFile(file: File): Promise<{ valid: boolean, error?: string }> {
-  // File type validation
-  const allowedTypes = ["text/plain", "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
-  if (!allowedTypes.includes(file.type)) {
-    return { valid: false, error: "Unsupported file type" }
-  }
-  
-  // File size validation (10MB limit)
-  if (file.size > 10 * 1024 * 1024) {
-    return { valid: false, error: "File too large" }
-  }
-  
-  // Filename sanitization
-  const sanitizedName = path.basename(file.name).replace(/[^a-zA-Z0-9.-]/g, '_')
-  
-  // Content validation - check for malicious patterns
-  const content = await file.text()
-  const suspiciousPatterns = [/<script/i, /javascript:/i, /vbscript:/i]
-  
-  for (const pattern of suspiciousPatterns) {
-    if (pattern.test(content)) {
-      return { valid: false, error: "Potentially malicious content detected" }
-    }
-  }
-  
-  // Generate file hash for integrity checking
-  const hash = createHash('sha256').update(content).digest('hex')
-  
-  return { valid: true }
-}
+import { mockDataStore } from "@/lib/mock-data-store"
+import type { Document } from "@/lib/mock-data-store"
 
 export async function POST(request: NextRequest) {
   const authResult = await requireAuth(request)
@@ -47,89 +9,42 @@ export async function POST(request: NextRequest) {
 
   try {
     const formData = await request.formData()
-    const file = formData.get("file")
+    const file = formData.get("file") as File | null
 
-    if (!file || !(file instanceof File)) {
-      return NextResponse.json({ error: "No file provided or invalid file type" }, { status: 400 })
+    if (!file) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 })
     }
 
-    console.log("[v0] File upload received:", { name: file.name, size: file.size, type: file.type })
+    // Development mode: simulate file upload
+    if (process.env.NEXT_PUBLIC_DEV_MODE === 'true') {
+      console.log('[v0] Dev mode: simulating file upload for:', file.name)
 
-    // Validate file using the new comprehensive validation function
-    const validationResult = await validateFile(file)
-    if (!validationResult.valid) {
-      return NextResponse.json({ error: validationResult.error }, { status: 400 })
-    }
-
-    // Generate unique IDs
-    const docId = `doc_${Date.now()}`
-    const jobId = uuidv4()
-    
-    // Read file content
-    const fileContent = await file.text()
-    
-    // Generate storage path
-    const fileExtension = path.extname(file.name)
-    const storagePath = `documents/${docId}${fileExtension}`
-    
-    // Create Blob for storage
-    const fileBlob = new Blob([fileContent], { type: file.type })
-    
-    // Save file to storage
-    await storage.saveFile(fileBlob, storagePath)
-    console.log(`[v0] File saved to storage at: ${storagePath}`)
-
-    // Create document metadata (without content)
-    const documentData = {
-      id: docId,
-      title: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
-      filename: file.name,
-      size: file.size,
-      uploadDate: new Date().toISOString(),
-      status: "queued",
-      chunks: 0,
-      storagePath: storagePath,
-    }
-
-    // Store document metadata in Redis
-    await safeRedisSet(`document:${docId}`, documentData)
-
-    // Create job and add to indexing queue
-    const jobResult = await indexingQueue.enqueue({
-      docId,
-      storagePath,
-      metadata: {
+      // Create mock document
+      const newDocument: Document = {
+        id: `doc-${Date.now()}`,
+        title: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
         filename: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        title: documentData.title,
-        size: documentData.size,
-        uploadDate: documentData.uploadDate
+        size: file.size,
+        uploadDate: new Date().toISOString(),
+        status: "indexed",
+        chunks: Math.floor(Math.random() * 50) + 10 // Random chunk count
       }
-    })
-    
-    if (!jobResult.success) {
-      throw new Error("Failed to enqueue document for processing")
-    }
-    
-    console.log("[v0] Document queued for processing:", { docId, jobId: jobResult.jobId })
 
-    // Return 202 Accepted with job information
-    return NextResponse.json({
-      success: true,
-      document: {
-        id: docId,
-        title: documentData.title,
-        filename: documentData.filename,
-        status: "queued",
-      },
-      job: {
-        id: jobResult.jobId,
-        status: "queued"
-      }
-    }, { status: 202 }) // 202 Accepted
+      mockDataStore.addDocument(newDocument)
+
+      return NextResponse.json({
+        success: true,
+        message: "Document uploaded successfully",
+        document: newDocument
+      })
+    }
+
+    // Production mode: actual file upload logic would go here
+    // This would involve saving to storage (S3, Supabase) and Redis
+    return NextResponse.json({ error: "Production mode not implemented yet" }, { status: 501 })
+
   } catch (error) {
-    console.error("[v0] Upload API error:", error)
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 })
+    console.error("[v0] Upload error:", error)
+    return NextResponse.json({ error: "Failed to upload document" }, { status: 500 })
   }
 }

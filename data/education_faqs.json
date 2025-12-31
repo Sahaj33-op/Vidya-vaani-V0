@@ -1,0 +1,102 @@
+[
+  {
+    "question": "What are the admission requirements for B.Tech?",
+    "answer": "For B.Tech admission, you need to have passed 12th standard with Physics, Chemistry, and Mathematics with a minimum of 60% aggregate. You must also qualify JEE Main or state-level engineering entrance exams. Direct admission is available for students with exceptional board scores.",
+    "category": "admission"
+  },
+  {
+    "question": "When does the admission process start?",
+    "answer": "The admission process typically starts in June after the declaration of 12th board results. Online registration opens on our website, and the last date for applications is usually July 31st. Document verification and counseling sessions are held in August.",
+    "category": "admission"
+  },
+  {
+    "question": "What documents are required for admission?",
+    "answer": "Required documents include: 10th and 12th mark sheets, Transfer Certificate, Migration Certificate, Character Certificate, Entrance exam scorecard, Aadhar Card, 4 passport-sized photographs, Category certificate (if applicable), and Income certificate for scholarship.",
+    "category": "admission"
+  },
+  {
+    "question": "What is the fee structure for undergraduate programs?",
+    "answer": "The annual fee for B.Tech programs is Rs. 1,20,000 which includes tuition fee, lab charges, and library fees. For B.Sc programs, the annual fee is Rs. 45,000. BBA and BCA programs have an annual fee of Rs. 60,000. Fee can be paid in two installments per semester.",
+    "category": "fees"
+  },
+  {
+    "question": "Are there any scholarships available?",
+    "answer": "Yes, we offer multiple scholarships: Merit scholarships for students with 90%+ marks (50% fee waiver), Sports scholarships for state/national level players, Need-based scholarships for economically weaker sections, and Government scholarships through National Scholarship Portal. SC/ST students get fee concessions as per government norms.",
+    "category": "fees"
+  },
+  {
+    "question": "What payment methods are accepted for fees?",
+    "answer": "We accept payments via online bank transfer (NEFT/RTGS), credit/debit cards, UPI payments, demand drafts, and cash at the accounts office. For online payments, use the student portal. EMI options are available through select bank partnerships.",
+    "category": "fees"
+  },
+  {
+    "question": "What courses are offered in the Computer Science department?",
+    "answer": "The Computer Science department offers: B.Tech in Computer Science & Engineering, B.Tech in Information Technology, B.Tech in AI & Machine Learning, B.Tech in Data Science, MCA (Master of Computer Applications), and M.Tech in Computer Science. Each program has specialized electives in cybersecurity, cloud computing, and IoT.",
+    "category": "courses"
+  },
+  {
+    "question": "What is the duration of the MBA program?",
+    "answer": "The MBA program is a 2-year full-time course divided into 4 semesters. Specializations available include Marketing, Finance, Human Resources, Operations, and Business Analytics. The program includes a mandatory 2-month summer internship after the first year.",
+    "category": "courses"
+  },
+  {
+    "question": "Does the college offer part-time or distance learning programs?",
+    "answer": "Yes, we offer part-time and distance learning options for working professionals. Programs include MBA (Executive), M.Tech (Part-time), and various diploma courses. Classes are held on weekends and through online platforms. These programs have the same curriculum and certification as regular programs.",
+    "category": "courses"
+  },
+  {
+    "question": "When are the semester examinations held?",
+    "answer": "Semester examinations are conducted twice a year: Winter session (November-December) for odd semesters and Summer session (April-May) for even semesters. The exam schedule is published on the college website one month before exams begin. Supplementary exams are held in July.",
+    "category": "exams"
+  },
+  {
+    "question": "What is the grading system followed?",
+    "answer": "We follow a 10-point CGPA grading system: A+ (10 points) for 90-100%, A (9) for 80-89%, B+ (8) for 70-79%, B (7) for 60-69%, C (6) for 50-59%, D (5) for 40-49%, and F (0) for below 40%. The minimum CGPA required to pass is 5.0.",
+    "category": "exams"
+  },
+  {
+    "question": "What is the attendance requirement?",
+    "answer": "A minimum of 75% attendance is mandatory to appear for semester examinations. Students with 65-75% attendance can appear with a medical certificate. Below 65% attendance results in detention. Attendance is tracked through biometric systems in classrooms.",
+    "category": "exams"
+  },
+  {
+    "question": "What are the hostel facilities?",
+    "answer": "Separate hostel facilities are available for boys and girls. Rooms are available in single, double, and triple sharing options. All rooms have attached bathrooms, WiFi, study tables, and wardrobes. Mess facility provides vegetarian and non-vegetarian options. Monthly rent ranges from Rs. 8,000 to Rs. 15,000 depending on room type.",
+    "category": "facilities"
+  },
+  {
+    "question": "What are the library timings?",
+    "answer": "The central library is open from 8:00 AM to 10:00 PM on weekdays and 9:00 AM to 6:00 PM on Saturdays. During exams, extended hours till midnight are available. The library has over 1,00,000 books, access to online journals (IEEE, Springer, Elsevier), and digital library facilities.",
+    "category": "facilities"
+  },
+  {
+    "question": "Are there sports facilities on campus?",
+    "answer": "Yes, the campus has extensive sports facilities including: Cricket and football grounds, Basketball and volleyball courts, Indoor badminton and table tennis halls, Swimming pool, Gymnasium with modern equipment, and Yoga and meditation center. Professional coaches are available for training.",
+    "category": "facilities"
+  },
+  {
+    "question": "What is the placement record of the college?",
+    "answer": "Our placement cell maintains strong industry connections with 300+ recruiting companies. Last year, 92% of eligible students were placed. The highest package offered was Rs. 45 LPA and average package was Rs. 8.5 LPA. Top recruiters include TCS, Infosys, Wipro, Amazon, Microsoft, and Deloitte.",
+    "category": "placement"
+  },
+  {
+    "question": "What support does the placement cell provide?",
+    "answer": "The placement cell provides comprehensive support including: Resume building workshops, Mock interviews and group discussions, Aptitude and technical training, Soft skills development programs, Industry expert guest lectures, and Internship opportunities. Training begins from the 5th semester.",
+    "category": "placement"
+  },
+  {
+    "question": "Are internships mandatory?",
+    "answer": "Yes, internships are mandatory for all undergraduate programs. B.Tech students must complete a 6-week summer internship after 6th semester. MBA students have a 2-month mandatory internship. The college has tie-ups with 500+ companies for internship placements. Internship carries academic credits.",
+    "category": "placement"
+  },
+  {
+    "question": "How can I contact the college administration?",
+    "answer": "You can reach us through: Main Office: +91-1234567890, Admission Helpline: +91-9876543210, Email: info@college.edu, Address: 123 Education Street, Knowledge City, State - 123456. Office hours are 9:00 AM to 5:00 PM, Monday to Saturday. You can also use the chatbot or raise queries through the student portal.",
+    "category": "contact"
+  },
+  {
+    "question": "What is the college ranking?",
+    "answer": "Our college is ranked among the top 50 engineering colleges in India by NIRF. We have NAAC A+ accreditation and NBA accreditation for all engineering programs. The college has been awarded 'Best Emerging University' by various education bodies.",
+    "category": "general"
+  }
+]

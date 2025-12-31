@@ -17,7 +17,8 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files
-.env*
+.env.local
+.env
 
 # vercel
 .vercel
@@ -28,3 +29,7 @@ next-env.d.ts
 
 # generated tests
 testsprite_tests/
+
+.claude/
+TASKS.md 
+CLAUDE.md

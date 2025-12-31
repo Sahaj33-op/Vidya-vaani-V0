@@ -1,12 +1,21 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { redis } from "@/lib/redis-helpers"
 import { requireAuth } from "@/lib/auth"
+import { mockDataStore } from "@/lib/mock-data-store"
 
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth(request)
   if (authResult instanceof NextResponse) return authResult
 
   try {
+    // Development mode: use mock data store
+    if (process.env.NEXT_PUBLIC_DEV_MODE === 'true') {
+      console.log('[v0] Dev mode: using mock data store for stats')
+      const stats = mockDataStore.getStats()
+      return NextResponse.json(stats)
+    }
+
+    // Production mode: use Redis
     if (!redis) {
       console.error("[v0] Redis client not initialized.")
       return NextResponse.json({ error: "Internal server error: Redis not available" }, { status: 500 })

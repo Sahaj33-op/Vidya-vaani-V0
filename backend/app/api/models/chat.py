@@ -3,7 +3,8 @@ from typing import List, Optional
 
 class ChatRequest(BaseModel):
     message: str
-    language: Optional[str] = None
+    language: Optional[str] = "en"
+    session_id: Optional[str] = None
 
 class RetrievedDocument(BaseModel):
     content: str

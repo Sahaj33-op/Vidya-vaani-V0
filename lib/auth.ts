@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function requireAuth(request: NextRequest): Promise<NextResponse | any> {
+  // Development mode: bypass authentication
+  if (process.env.NEXT_PUBLIC_DEV_MODE === 'true') {
+    console.log('[v0] Dev mode: bypassing authentication')
+    return { userId: 'dev-user', role: 'admin', email: 'dev@localhost' }
+  }
+
+  // Production mode: verify token with backend
   const token = request.headers.get('authorization')?.replace('Bearer ', '')
 
   if (!token) {

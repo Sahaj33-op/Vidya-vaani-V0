@@ -5,22 +5,49 @@ from fastapi.responses import JSONResponse
 from app.api.models.chat import ChatRequest, ChatResponse, RetrievedDocument
 from app.services.llm_service import LLMService
 from app.services.stt_service import STTService
-from app.dependencies import get_llm_service, get_stt_service, get_rasa_service
+from app.services.rag_service import RAGService
+from app.dependencies import get_llm_service, get_stt_service, get_rasa_service, get_rag_service
 from app.core.config import settings
 from typing import List, Dict, Any, Optional
-import redis
 import json
 
 router = APIRouter()
 
-# Redis connection for caching
-redis_client = redis.Redis(
-    host=settings.REDIS_HOST,
-    port=settings.REDIS_PORT,
-    password=settings.REDIS_PASSWORD,
-    db=settings.REDIS_DB,
-    decode_responses=True
-)
+# In-memory cache for demo mode
+_demo_cache: Dict[str, str] = {}
+
+# Redis connection for caching (only if enabled)
+redis_client = None
+if settings.REDIS_ENABLED:
+    try:
+        import redis
+        redis_client = redis.Redis(
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            password=settings.REDIS_PASSWORD,
+            db=settings.REDIS_DB,
+            decode_responses=True
+        )
+        # Test connection
+        redis_client.ping()
+    except Exception as e:
+        print(f"Redis connection failed, using in-memory cache: {e}")
+        redis_client = None
+
+
+def cache_get(key: str) -> Optional[str]:
+    """Get value from cache (Redis or in-memory)."""
+    if redis_client:
+        return redis_client.get(key)
+    return _demo_cache.get(key)
+
+
+def cache_set(key: str, value: str, ttl: int = 900) -> None:
+    """Set value in cache (Redis or in-memory)."""
+    if redis_client:
+        redis_client.setex(key, ttl, value)
+    else:
+        _demo_cache[key] = value
 
 async def detect_language(text: str) -> Dict[str, Any]:
     """Detect language from text."""
@@ -155,78 +182,100 @@ async def generate_static_response(intent: str, lang: str) -> ChatResponse:
     )
 
 @router.post("/text", response_model=ChatResponse)
-async def chat_text(request: ChatRequest, llm_service: LLMService = Depends(get_llm_service)):
+async def chat_text(
+    request: ChatRequest,
+    llm_service: LLMService = Depends(get_llm_service),
+    rag_service: RAGService = Depends(get_rag_service)
+):
     """Process text chat requests with full orchestration."""
     try:
         # Check cache first
         cache_key = f"chat:{hashlib.sha256(request.message.encode()).hexdigest()}"
-        cached_response = redis_client.get(cache_key)
+        cached_response = cache_get(cache_key)
         if cached_response:
             return ChatResponse(**json.loads(cached_response))
-        
+
         # Language detection and translation to English
         language_info = await detect_language(request.message)
         english_text = language_info["processed_text"]
         original_language = language_info["detected_language"]
         translated_to_english = False
-        
+
         if language_info["translation_needed"] and original_language != 'en':
             translation_result = await translate_text(english_text, original_language, 'en')
             if translation_result["confidence"] > 0.5:
                 english_text = translation_result["translated_text"]
                 translated_to_english = True
-        
-        # Get intent and entities from Rasa NLU
-        nlu_result = await get_nlu_intent_and_entities(english_text, 'en')
-        intent = nlu_result["intent"]
-        entities = nlu_result["entities"]
-        
+
+        # Get intent and entities from Rasa NLU (skip in demo mode)
+        intent = "general_query"
+        entities = []
+        if not settings.DEMO_MODE:
+            nlu_result = await get_nlu_intent_and_entities(english_text, 'en')
+            intent = nlu_result["intent"]
+            entities = nlu_result["entities"]
+
         response: ChatResponse
-        
+
         # Handle specific intents that don't require LLM/RAG
         if intent in ['out_of_scope', 'request_human_handoff']:
             response = await generate_static_response(intent, original_language)
         else:
-            # RAG Retrieval
-            rag_result = await retrieve_context_documents(english_text, 'en', 5)
-            context = rag_result["retrieved_chunks"]
-            source_ids = rag_result["sources"]
-            
+            # RAG Retrieval - now works in both demo and production modes
+            context = []
+            source_ids = []
+
+            # Use the RAG service to get relevant context
+            rag_results = rag_service.search(
+                query=english_text,
+                top_k=5,
+                score_threshold=0.3
+            )
+
+            if rag_results:
+                context = [r['text'] for r in rag_results]
+                source_ids = list(set(r['doc_id'] for r in rag_results))
+
             # Generate response using LLM with RAG context
             llm_response = llm_service.generate_response(english_text, context)
-            
+
             response = ChatResponse(
                 reply=llm_response,
                 source_ids=source_ids,
-                action="answer:llm",
+                action="answer:llm" if context else "answer:llm_no_context",
                 translated=translated_to_english,
                 original_language=original_language,
-                confidence=0.8  # Placeholder confidence
+                confidence=0.8 if context else 0.5
             )
-        
+
         # Translate response back to original language if needed
         if translated_to_english and response.reply:
             translation_result = await translate_text(response.reply, 'en', original_language)
             if translation_result["confidence"] > 0.5:
                 response.reply = translation_result["translated_text"]
                 response.translated = True
-        
+
         # Cache the response
-        redis_client.setex(cache_key, 900, json.dumps(response.dict()))
-        
+        cache_set(cache_key, json.dumps(response.model_dump()))
+
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing chat request: {str(e)}")
 
 @router.post("/voice", response_model=ChatResponse)
-async def chat_voice(audio_file: UploadFile = File(...), stt_service: STTService = Depends(get_stt_service), llm_service: LLMService = Depends(get_llm_service)):
+async def chat_voice(
+    audio_file: UploadFile = File(...),
+    stt_service: STTService = Depends(get_stt_service),
+    llm_service: LLMService = Depends(get_llm_service),
+    rag_service: RAGService = Depends(get_rag_service)
+):
     """Process voice chat requests."""
     try:
         audio_data = await audio_file.read()
         transcribed_text = stt_service.transcribe_audio(audio_data)
-        
+
         # Create a ChatRequest and process it through the text endpoint logic
         request = ChatRequest(message=transcribed_text)
-        return await chat_text(request, llm_service)
+        return await chat_text(request, llm_service, rag_service)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing voice request: {str(e)}")

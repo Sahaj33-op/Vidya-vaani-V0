@@ -143,15 +143,83 @@ export function AdminDashboard() {
 
   const handleDeleteDocument = async (docId: string) => {
     try {
+      console.log('[v0] Deleting document:', docId)
       const response = await fetch(`/api/admin/documents/${docId}`, {
         method: "DELETE",
       })
 
       if (response.ok) {
+        console.log('[v0] Document deleted successfully')
         setDocuments((prev) => prev.filter((doc) => doc.id !== docId))
+        // Refresh stats after deletion
+        const statsResponse = await fetch('/api/admin/stats')
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json()
+          setSystemStats(statsData)
+        }
+      } else {
+        const errorData = await response.json()
+        console.error('[v0] Delete failed:', errorData)
+        alert(`Failed to delete document: ${errorData.error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error("[v0] Delete error:", error)
+      alert('Network error: Could not delete document')
+    }
+  }
+
+  const handleDownloadDocument = async (doc: Document) => {
+    try {
+      console.log('[v0] Downloading document:', doc.filename)
+
+      // In development mode, create a demo download
+      if (process.env.NEXT_PUBLIC_DEV_MODE === 'true') {
+        // Create a text file with document information as a demo
+        const demoContent = `Document Information
+=====================
+
+Title: ${doc.title}
+Filename: ${doc.filename}
+Size: ${(doc.size / 1024).toFixed(2)} KB
+Upload Date: ${new Date(doc.uploadDate).toLocaleString()}
+Status: ${doc.status}
+Chunks: ${doc.chunks}
+
+Note: This is a demo download in development mode.
+In production, the actual document file would be downloaded.
+`
+        const blob = new Blob([demoContent], { type: 'text/plain' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `${doc.title}.txt`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+        console.log('[v0] Demo download triggered')
+        return
+      }
+
+      // Production mode: fetch actual file from backend
+      const response = await fetch(`/api/admin/documents/${doc.id}/download`)
+      if (!response.ok) {
+        throw new Error('Download failed')
+      }
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = doc.filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      console.log('[v0] File downloaded successfully')
+    } catch (error) {
+      console.error('[v0] Download error:', error)
+      alert('Failed to download document. Please try again.')
     }
   }
 
@@ -352,7 +420,12 @@ export function AdminDashboard() {
                               </div>
                               <div className="flex items-center space-x-2">
                                 <Badge className={getStatusColor(doc.status)}>{doc.status}</Badge>
-                                <Button variant="ghost" size="sm">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  aria-label="Download document"
+                                  onClick={() => handleDownloadDocument(doc)}
+                                >
                                   <Download className="h-4 w-4" />
                                 </Button>
                                 <Button
@@ -360,6 +433,7 @@ export function AdminDashboard() {
                                   size="sm"
                                   onClick={() => handleDeleteDocument(doc.id)}
                                   className="text-destructive hover:text-destructive"
+                                  aria-label="Delete document"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>

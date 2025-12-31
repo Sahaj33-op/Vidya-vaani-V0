@@ -9,3 +9,7 @@ python-multipart
 supabase
 psycopg2-binary
 sqlalchemy-utils
+google-generativeai
+sentence-transformers
+faiss-cpu
+numpy
