@@ -1105,6 +1105,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 **Made with ❤️ for Smart India Hackathon 2025**
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Sahaj33-op/Vidya-vaani-V0)
 [![GitHub Stars](https://img.shields.io/github/stars/sahaj33-op/vidya-vaani-v0?style=social)](https://github.com/sahaj33-op/vidya-vaani-v0/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/sahaj33-op/vidya-vaani-v0?style=social)](https://github.com/sahaj33-op/vidya-vaani-v0/network/members)
 
