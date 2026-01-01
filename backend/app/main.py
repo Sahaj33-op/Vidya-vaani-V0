@@ -138,11 +138,13 @@ async def validate_production_config():
         if not settings.GEMINI_API_KEY:
             missing_configs.append("GEMINI_API_KEY")
 
-        if not settings.SUPABASE_URL:
-            missing_configs.append("SUPABASE_URL")
+        # Supabase is optional - only needed for full production with database
+        # For hackathon demo, we can use local storage and mock services
+        # if not settings.SUPABASE_URL:
+        #     missing_configs.append("SUPABASE_URL")
 
-        if not settings.SUPABASE_SERVICE_KEY:
-            missing_configs.append("SUPABASE_SERVICE_KEY")
+        # if not settings.SUPABASE_SERVICE_KEY:
+        #     missing_configs.append("SUPABASE_SERVICE_KEY")
 
         if settings.REDIS_ENABLED and not settings.REDIS_HOST:
             missing_configs.append("REDIS_HOST")

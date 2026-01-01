@@ -1,50 +1,100 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { requireAuth } from "@/lib/auth"
-import { mockDataStore } from "@/lib/mock-data-store"
-import type { Document } from "@/lib/mock-data-store"
+import { type NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
-  const authResult = await requireAuth(request)
-  if (authResult instanceof NextResponse) return authResult
+  const authResult = await requireAuth(request);
+  if (authResult instanceof NextResponse) return authResult;
 
   try {
-    const formData = await request.formData()
-    const file = formData.get("file") as File | null
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 })
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Development mode: simulate file upload
-    if (process.env.NEXT_PUBLIC_DEV_MODE === 'true') {
-      console.log('[v0] Dev mode: simulating file upload for:', file.name)
+    // Read file content
+    const fileContent = await file.text();
 
-      // Create mock document
-      const newDocument: Document = {
-        id: `doc-${Date.now()}`,
-        title: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
-        filename: file.name,
-        size: file.size,
-        uploadDate: new Date().toISOString(),
-        status: "indexed",
-        chunks: Math.floor(Math.random() * 50) + 10 // Random chunk count
+    console.log(
+      "[Admin] Uploading document:",
+      file.name,
+      "Size:",
+      file.size,
+      "bytes",
+    );
+
+    // Send to backend for indexing
+    const backendUrl =
+      process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+    try {
+      const response = await fetch(`${backendUrl}/api/v1/documents/upload`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          filename: file.name,
+          content: fileContent,
+          metadata: {
+            uploadedAt: new Date().toISOString(),
+            size: file.size,
+            type: file.type || "text/plain",
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[Admin] Backend upload failed:", errorText);
+        throw new Error(`Backend error: ${response.status}`);
       }
 
-      mockDataStore.addDocument(newDocument)
+      const result = await response.json();
+      console.log("[Admin] Document indexed successfully:", result);
 
       return NextResponse.json({
         success: true,
-        message: "Document uploaded successfully",
-        document: newDocument
-      })
+        message: "Document uploaded and indexed successfully",
+        document: {
+          id: result.doc_id || `doc-${Date.now()}`,
+          title: file.name.replace(/\.[^/.]+$/, ""),
+          filename: file.name,
+          size: file.size,
+          uploadDate: new Date().toISOString(),
+          status: "indexed",
+          chunks: result.chunks_created || 0,
+        },
+      });
+    } catch (backendError) {
+      console.error("[Admin] Backend request failed:", backendError);
+
+      // Fallback: Still accept the upload but warn it's not indexed
+      return NextResponse.json({
+        success: true,
+        message: "Document uploaded (RAG indexing unavailable)",
+        document: {
+          id: `doc-${Date.now()}`,
+          title: file.name.replace(/\.[^/.]+$/, ""),
+          filename: file.name,
+          size: file.size,
+          uploadDate: new Date().toISOString(),
+          status: "pending",
+          chunks: 0,
+        },
+        warning:
+          "Document saved but not indexed in RAG system. Backend may be unavailable.",
+      });
     }
-
-    // Production mode: actual file upload logic would go here
-    // This would involve saving to storage (S3, Supabase) and Redis
-    return NextResponse.json({ error: "Production mode not implemented yet" }, { status: 501 })
-
   } catch (error) {
-    console.error("[v0] Upload error:", error)
-    return NextResponse.json({ error: "Failed to upload document" }, { status: 500 })
+    console.error("[Admin] Upload error:", error);
+    return NextResponse.json(
+      {
+        error: "Failed to upload document",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }

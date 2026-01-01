@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Set
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from pydantic import BaseModel
 
 from app.api.models.documents import DocumentUploadRequest, DocumentUploadResponse
 from app.dependencies import get_ocr_service, get_rag_service, get_storage_service
@@ -25,6 +26,14 @@ ALLOWED_MIME_TYPES: Set[str] = {
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
 
+class DocumentUploadJSONRequest(BaseModel):
+    """JSON-based document upload for easier frontend integration"""
+
+    filename: str
+    content: str
+    metadata: dict = {}
+
+
 def validate_file(file: UploadFile) -> None:
     """Validate uploaded file for security and size constraints"""
     if not file.filename:
@@ -44,7 +53,99 @@ def validate_file(file: UploadFile) -> None:
         )
 
 
-@router.post("/upload", response_model=DocumentUploadResponse)
+@router.get("/list")
+async def list_documents(
+    storage_service: StorageService = Depends(get_storage_service),
+):
+    """
+    List all indexed documents with metadata
+    """
+    try:
+        # Get list of files from storage
+        files = storage_service.list_files()
+
+        documents = []
+        for filename in files:
+            try:
+                # Get file metadata if available
+                file_path = storage_service.storage_path / filename
+                if file_path.exists():
+                    stat = file_path.stat()
+                    documents.append(
+                        {
+                            "id": f"doc_{filename}",
+                            "title": filename.replace(".txt", "").replace("_", " "),
+                            "filename": filename,
+                            "size": stat.st_size,
+                            "uploadDate": stat.st_mtime,
+                            "status": "indexed",
+                            "chunks": 0,  # Could be enhanced to track chunk count
+                        }
+                    )
+            except Exception as e:
+                logger.error(f"Error reading file {filename}: {e}")
+                continue
+
+        return {
+            "success": True,
+            "documents": documents,
+            "total": len(documents),
+        }
+    except Exception as e:
+        logger.error(f"Failed to list documents: {e}", exc_info=True)
+        return {
+            "success": False,
+            "documents": [],
+            "total": 0,
+        }
+
+
+@router.post("/upload")
+async def upload_document_json(
+    request: DocumentUploadJSONRequest,
+    rag_service: RAGService = Depends(get_rag_service),
+):
+    """
+    Upload and index a document (JSON format for easy frontend integration)
+    """
+    try:
+        # Generate document ID
+        doc_id = f"doc_{request.filename.replace(' ', '_')}_{len(request.content)}"
+
+        # Index the document in RAG
+        documents = [
+            {
+                "doc_id": doc_id,
+                "content": request.content,
+                "metadata": {"filename": request.filename, **request.metadata},
+            }
+        ]
+
+        rag_service.add_documents(documents)
+
+        # Get stats to return chunk count
+        stats = rag_service.get_stats()
+
+        logger.info(
+            f"Successfully indexed document: {request.filename} ({len(request.content)} chars)"
+        )
+
+        return {
+            "success": True,
+            "message": "Document uploaded and indexed successfully",
+            "doc_id": doc_id,
+            "chunks_created": stats.get("total_chunks", 0),
+            "filename": request.filename,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to upload document: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to upload document: {str(e)}"
+        )
+
+
+@router.post("/upload-file", response_model=DocumentUploadResponse)
 async def upload_documents(
     file: UploadFile = File(...),
     storage_service: StorageService = Depends(get_storage_service),

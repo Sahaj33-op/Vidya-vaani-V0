@@ -1,6 +1,9 @@
 {
-  "name": "my-v0-project",
-  "version": "0.1.0",
+  "name": "vidya-vaani",
+  "version": "1.0.0",
+  "description": "Multilingual AI Education Chatbot for Smart India Hackathon 2025",
+  "author": "Team Vidya Vaani",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "build": "next build",

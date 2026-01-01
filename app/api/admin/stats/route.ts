@@ -1,41 +1,39 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { redis } from "@/lib/redis-helpers";
 import { requireAuth } from "@/lib/auth";
-import { mockDataStore } from "@/lib/mock-data-store";
 
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
 
   try {
-    // Development mode: use mock data store
-    if (process.env.NEXT_PUBLIC_DEV_MODE === "true") {
-      console.log("[v0] Dev mode: using mock data store for stats");
-      const stats = mockDataStore.getStats();
-      return NextResponse.json(stats);
+    const backendUrl =
+      process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+    // Fetch stats from backend
+    try {
+      const response = await fetch(`${backendUrl}/api/v1/admin/stats`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const backendStats = await response.json();
+        return NextResponse.json(backendStats);
+      }
+    } catch (backendError) {
+      console.error("[v0] Backend stats unavailable:", backendError);
     }
 
-    // Production mode: use Redis
-    if (!redis) {
-      console.error("[v0] Redis client not initialized.");
-      return NextResponse.json(
-        { error: "Internal server error: Redis not available" },
-        { status: 500 },
-      );
-    }
-
-    const redisClient = redis;
-
-    const totalDocuments = (await redisClient.keys("document:*")).length;
-    const totalHandoffRequests = (await redisClient.keys("handoff:*")).length;
-
+    // Fallback to basic stats
     const stats = {
-      totalDocuments: totalDocuments,
+      totalDocuments: 0,
       totalChunks: 0,
       totalQueries: 0,
       avgResponseTime: 0,
       activeUsers: 0,
-      handoffRequests: totalHandoffRequests,
+      handoffRequests: 0,
     };
 
     return NextResponse.json(stats);

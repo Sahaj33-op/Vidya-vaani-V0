@@ -1,13 +1,22 @@
+import logging
 import os
 from abc import ABC, abstractmethod
-from app.core.config import settings
-from typing import List, Any, Optional
+from typing import Any, List, Optional
+
 import google.generativeai as genai
+
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
 
 class LLMService(ABC):
     @abstractmethod
-    def generate_response(self, prompt: str, context: Optional[List[Any]] = None) -> str:
+    def generate_response(
+        self, prompt: str, context: Optional[List[Any]] = None
+    ) -> str:
         pass
+
 
 class MockLLMService(LLMService):
     """Mock LLM service for demo mode - provides keyword-based responses."""
@@ -27,7 +36,9 @@ class MockLLMService(LLMService):
         }
         self.default_response = "Thank you for your question. For specific information about our college, please visit our website or contact the administration office at admissions@college.edu."
 
-    def generate_response(self, prompt: str, context: Optional[List[Any]] = None) -> str:
+    def generate_response(
+        self, prompt: str, context: Optional[List[Any]] = None
+    ) -> str:
         prompt_lower = prompt.lower()
 
         # Check for keyword matches
@@ -44,16 +55,17 @@ class MockLLMService(LLMService):
 
         return self.default_response
 
+
 class GeminiLLMService(LLMService):
     def __init__(self):
         self.api_key = settings.GEMINI_API_KEY
         if not self.api_key or self.api_key == "your_gemini_api_key_here":
             raise ValueError("GEMINI_API_KEY is not properly configured in .env file")
-        
+
         # Configure Gemini SDK
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
-        
+        self.model = genai.GenerativeModel("gemini-2.5-flash-lite")
+
         # Education-focused system prompt
         self.system_prompt = """You are Vidya Vaani, a helpful and knowledgeable education assistant for colleges and universities.
 
@@ -66,13 +78,18 @@ Your role:
 
 Context: You're assisting students and parents with college-related queries. Always prioritize clarity and helpfulness."""
 
-    def generate_response(self, prompt: str, context: Optional[List[Any]] = None) -> str:
+    def generate_response(
+        self, prompt: str, context: Optional[List[Any]] = None
+    ) -> str:
         try:
             # Prepare context for RAG if available
             context_text = ""
             if context and len(context) > 0:
-                context_text = "\n\nRelevant information from our knowledge base:\n" + "\n".join([str(doc) for doc in context[:3]])  # Limit to top 3 for token efficiency
-            
+                context_text = (
+                    "\n\nRelevant information from our knowledge base:\n"
+                    + "\n".join([str(doc) for doc in context[:3]])
+                )  # Limit to top 3 for token efficiency
+
             # Construct the full prompt
             full_prompt = f"""{self.system_prompt}
 
@@ -80,15 +97,15 @@ Student Question: {prompt}
 {context_text}
 
 Answer:"""
-            
+
             # Generate response using Gemini
             response = self.model.generate_content(full_prompt)
-            
+
             if not response or not response.text:
                 return "I apologize, but I'm having trouble generating a response right now. Please try again."
-            
+
             return response.text.strip()
-            
+
         except Exception as e:
-            print(f"Error generating Gemini response: {e}")
+            logger.error(f"Error generating Gemini response: {e}", exc_info=True)
             return "I apologize, but I'm experiencing technical difficulties. Please try asking your question again or contact the college office for assistance."

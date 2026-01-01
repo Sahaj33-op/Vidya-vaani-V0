@@ -7,6 +7,10 @@ import {
   loadMessagesFromLocalStorage,
   saveMessagesToLocalStorage,
 } from "@/lib/chat-utils";
+import { createLogger } from "@/lib/logger";
+import { fetchWithTimeout, TimeoutError } from "@/lib/fetch-utils";
+
+const logger = createLogger("useChat");
 
 interface ChatAPIResponse {
   response: string;
@@ -73,8 +77,8 @@ export function useChat(): UseChatReturn {
     setMessages((prev) => [...prev, userMessage]);
 
     try {
-      // Call chat API
-      const response = await fetch("/api/chat", {
+      // Call chat API with timeout
+      const response = await fetchWithTimeout("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -101,8 +105,12 @@ export function useChat(): UseChatReturn {
 
       setMessages((prev) => [...prev, botMessage]);
     } catch (err) {
-      console.error("[useChat] Error:", err);
-      setError("Failed to send message. Please try again.");
+      logger.error("Error sending message", err);
+      if (err instanceof TimeoutError) {
+        setError("Request timed out. Please try again.");
+      } else {
+        setError("Failed to send message. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }

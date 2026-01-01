@@ -99,10 +99,224 @@ export function ChatInterface() {
               <h2 className="text-2xl font-bold mb-2">
                 Welcome to Vidya Vaani!
               </h2>
-              <p className="text-muted-foreground max-w-md">
+              <p className="text-muted-foreground max-w-md mb-8">
                 Ask me anything about admissions, courses, fees, or college
                 policies. I can help you in English, Hindi, Marathi, or Marwari.
               </p>
+
+              {/* Suggested Questions */}
+              <div className="w-full max-w-2xl">
+                <h3 className="text-sm font-semibold text-muted-foreground mb-3">
+                  Try asking:
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {language === "en" && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("What is the admission process?");
+                          sendMessage(
+                            "What is the admission process?",
+                            language,
+                          );
+                        }}
+                      >
+                        <span className="text-sm">
+                          What is the admission process?
+                        </span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("How much are the fees?");
+                          sendMessage("How much are the fees?", language);
+                        }}
+                      >
+                        <span className="text-sm">How much are the fees?</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("Tell me about scholarships");
+                          sendMessage("Tell me about scholarships", language);
+                        }}
+                      >
+                        <span className="text-sm">
+                          Tell me about scholarships
+                        </span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("What courses do you offer?");
+                          sendMessage("What courses do you offer?", language);
+                        }}
+                      >
+                        <span className="text-sm">
+                          What courses do you offer?
+                        </span>
+                      </Button>
+                    </>
+                  )}
+                  {language === "hi" && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("प्रवेश प्रक्रिया क्या है?");
+                          sendMessage("प्रवेश प्रक्रिया क्या है?", language);
+                        }}
+                      >
+                        <span className="text-sm">
+                          प्रवेश प्रक्रिया क्या है?
+                        </span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("फीस कितनी है?");
+                          sendMessage("फीस कितनी है?", language);
+                        }}
+                      >
+                        <span className="text-sm">फीस कितनी है?</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("छात्रवृत्ति के बारे में बताएं");
+                          sendMessage(
+                            "छात्रवृत्ति के बारे में बताएं",
+                            language,
+                          );
+                        }}
+                      >
+                        <span className="text-sm">
+                          छात्रवृत्ति के बारे में बताएं
+                        </span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("कौन से कोर्स उपलब्ध हैं?");
+                          sendMessage("कौन से कोर्स उपलब्ध हैं?", language);
+                        }}
+                      >
+                        <span className="text-sm">
+                          कौन से कोर्स उपलब्ध हैं?
+                        </span>
+                      </Button>
+                    </>
+                  )}
+                  {language === "mr" && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("प्रवेश प्रक्रिया काय आहे?");
+                          sendMessage("प्रवेश प्रक्रिया काय आहे?", language);
+                        }}
+                      >
+                        <span className="text-sm">
+                          प्रवेश प्रक्रिया काय आहे?
+                        </span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("फी किती आहे?");
+                          sendMessage("फी किती आहे?", language);
+                        }}
+                      >
+                        <span className="text-sm">फी किती आहे?</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("शिष्यवृत्तीबद्दल सांगा");
+                          sendMessage("शिष्यवृत्तीबद्दल सांगा", language);
+                        }}
+                      >
+                        <span className="text-sm">शिष्यवृत्तीबद्दल सांगा</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("कोणते अभ्यासक्रम उपलब्ध आहेत?");
+                          sendMessage(
+                            "कोणते अभ्यासक्रम उपलब्ध आहेत?",
+                            language,
+                          );
+                        }}
+                      >
+                        <span className="text-sm">
+                          कोणते अभ्यासक्रम उपलब्ध आहेत?
+                        </span>
+                      </Button>
+                    </>
+                  )}
+                  {language === "mwr" && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("दाखिला प्रक्रिया क्या है?");
+                          sendMessage("दाखिला प्रक्रिया क्या है?", language);
+                        }}
+                      >
+                        <span className="text-sm">
+                          दाखिला प्रक्रिया क्या है?
+                        </span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("फीस कितनी है?");
+                          sendMessage("फीस कितनी है?", language);
+                        }}
+                      >
+                        <span className="text-sm">फीस कितनी है?</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("छात्रवृत्ति के बारे में बताओ");
+                          sendMessage("छात्रवृत्ति के बारे में बताओ", language);
+                        }}
+                      >
+                        <span className="text-sm">
+                          छात्रवृत्ति के बारे में बताओ
+                        </span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="text-left justify-start h-auto py-3 px-4"
+                        onClick={() => {
+                          setInput("कौनसे कोर्स मिलेंगे?");
+                          sendMessage("कौनसे कोर्स मिलेंगे?", language);
+                        }}
+                      >
+                        <span className="text-sm">कौनसे कोर्स मिलेंगे?</span>
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 

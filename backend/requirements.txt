@@ -10,9 +10,11 @@ supabase
 psycopg2-binary
 sqlalchemy-utils
 google-generativeai
+google-cloud-speech
 sentence-transformers
 faiss-cpu
 numpy
+filelock
 # Document parsing
 pdfplumber
 PyPDF2

@@ -121,42 +121,85 @@ class MockTranslationService(TranslationService):
 
         # Common Hindi-English translations for demo
         self.hindi_to_english = {
+            # Greetings
             "नमस्ते": "Hello",
             "धन्यवाद": "Thank you",
             "कृपया": "Please",
+            # Education terms
             "फीस": "fees",
+            "शुल्क": "fees",
             "प्रवेश": "admission",
             "समय": "time",
             "कॉलेज": "college",
+            "महाविद्यालय": "college",
             "परीक्षा": "exam",
             "छात्रवृत्ति": "scholarship",
             "हॉस्टल": "hostel",
             "प्लेसमेंट": "placement",
             "कोर्स": "course",
+            "पाठ्यक्रम": "course",
+            # Question words and phrases
             "क्या है": "what is",
+            "कितना है": "how much is",
+            "कितनी है": "how much is",
+            "कितने हैं": "how much are",
             "कैसे": "how",
             "कब": "when",
             "कहाँ": "where",
+            "कौन": "who",
+            "क्यों": "why",
+            # Common words
+            "है": "is",
+            "हैं": "are",
+            "का": "of",
+            "की": "of",
+            "के": "of",
+            "में": "in",
+            "से": "from",
+            "को": "to",
+            "और": "and",
+            "या": "or",
+            "लेकिन": "but",
         }
 
         # Common English-Hindi translations for demo
         self.english_to_hindi = {
+            # Greetings
             "hello": "नमस्ते",
             "thank you": "धन्यवाद",
             "please": "कृपया",
+            # Education terms
             "fees": "फीस",
+            "fee": "शुल्क",
             "admission": "प्रवेश",
+            "admissions": "प्रवेश",
             "time": "समय",
             "college": "कॉलेज",
             "exam": "परीक्षा",
+            "examination": "परीक्षा",
             "scholarship": "छात्रवृत्ति",
             "hostel": "हॉस्टल",
             "placement": "प्लेसमेंट",
             "course": "कोर्स",
+            "courses": "पाठ्यक्रम",
+            # Question words
             "what is": "क्या है",
+            "how much": "कितना",
             "how": "कैसे",
             "when": "कब",
             "where": "कहाँ",
+            "who": "कौन",
+            "why": "क्यों",
+            # Common words
+            "is": "है",
+            "are": "हैं",
+            "of": "का",
+            "in": "में",
+            "from": "से",
+            "to": "को",
+            "and": "और",
+            "or": "या",
+            "but": "लेकिन",
         }
 
         logger.info("MockTranslationService initialized")
@@ -219,7 +262,7 @@ class MockTranslationService(TranslationService):
     def translate(
         self, text: str, source_lang: str, target_lang: str
     ) -> Dict[str, Any]:
-        """Mock translation with keyword replacement"""
+        """Mock translation with phrase-aware keyword replacement"""
         if source_lang == target_lang:
             return {
                 "translated_text": text,
@@ -231,39 +274,45 @@ class MockTranslationService(TranslationService):
 
         translated = text
 
-        # Simple keyword-based translation
+        # Phrase-aware translation - process longer phrases first
         if source_lang == "hi" and target_lang == "en":
-            for hindi, english in self.hindi_to_english.items():
-                translated = translated.replace(hindi, english)
-            # Add note for demo
-            if translated != text:
-                translated = f"[Translated from Hindi] {translated}"
+            # Sort by length (descending) to match multi-word phrases first
+            sorted_pairs = sorted(
+                self.hindi_to_english.items(), key=lambda x: len(x[0]), reverse=True
+            )
+            for hindi, english in sorted_pairs:
+                if hindi in translated:
+                    translated = translated.replace(hindi, english)
 
         elif source_lang == "en" and target_lang == "hi":
-            text_lower = text.lower()
-            for english, hindi in self.english_to_hindi.items():
-                if english in text_lower:
-                    translated = re.sub(
-                        re.escape(english), hindi, translated, flags=re.IGNORECASE
-                    )
-            if translated != text:
-                translated = f"[हिंदी में अनुवादित] {translated}"
+            # Sort by length (descending) to match multi-word phrases first
+            sorted_pairs = sorted(
+                self.english_to_hindi.items(), key=lambda x: len(x[0]), reverse=True
+            )
+            for english, hindi in sorted_pairs:
+                # Case-insensitive replacement
+                translated = re.sub(
+                    re.escape(english), hindi, translated, flags=re.IGNORECASE
+                )
 
         elif source_lang == "mr" and target_lang == "en":
-            translated = f"[Translated from Marathi] {text}"
+            # Basic Marathi support - just mark as needing translation
+            # In production, this would use actual Marathi translation
+            pass
 
         elif source_lang == "en" and target_lang == "mr":
-            translated = f"[मराठी मध्ये अनुवादित] {text}"
+            # Basic Marathi support
+            pass
 
         else:
-            # For unsupported language pairs, just mark as translated
-            translated = f"[Translated: {source_lang} -> {target_lang}] {text}"
+            # For unsupported language pairs, return original text
+            pass
 
         return {
             "translated_text": translated,
             "source_language": source_lang,
             "target_language": target_lang,
-            "confidence": 0.7,
+            "confidence": 0.7 if translated != text else 0.3,
             "is_mock": True,
         }
 

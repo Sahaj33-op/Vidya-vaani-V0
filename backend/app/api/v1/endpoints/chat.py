@@ -1,17 +1,23 @@
+"""
+Chat API Endpoint - Simplified without Rasa NLU
+Gemini handles everything: understanding, context, and multilingual responses
+"""
+
 import hashlib
 import json
+import logging
 from typing import Any, Dict, List, Optional
 
-import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
-from app.api.models.chat import ChatRequest, ChatResponse, RetrievedDocument
+logger = logging.getLogger(__name__)
+
+from app.api.models.chat import ChatRequest, ChatResponse
 from app.core.config import settings
 from app.dependencies import (
     get_llm_service,
     get_rag_service,
-    get_rasa_service,
     get_stt_service,
     get_translation_service,
 )
@@ -22,7 +28,7 @@ from app.services.translation_service import TranslationHelper, TranslationServi
 
 router = APIRouter()
 
-# In-memory cache for demo mode
+# In-memory cache
 _demo_cache: Dict[str, str] = {}
 
 # Redis connection for caching (only if enabled)
@@ -42,10 +48,6 @@ if settings.REDIS_ENABLED:
         logger.info("Redis connection established successfully")
     except Exception as e:
         logger.error(f"Redis connection failed, using in-memory cache: {e}")
-        if not settings.DEMO_MODE:
-            logger.warning(
-                "Running production without Redis - this may impact performance"
-            )
         redis_client = None
 
 
@@ -64,141 +66,55 @@ def cache_set(key: str, value: str, ttl: int = 900) -> None:
         _demo_cache[key] = value
 
 
-async def detect_language(text: str) -> Dict[str, Any]:
-    """Detect language from text."""
-    # Simple detection logic - in production, use a proper language detection service
-    hindi_keywords = ["नमस्ते", "फीस", "प्रवेश", "समय"]
-    marathi_keywords = ["नमस्कार", "फी", "प्रवेश", "वेळ"]
+def detect_language(text: str) -> str:
+    """Simple language detection based on script/characters"""
+    # Devanagari script (Hindi/Marathi)
+    if any("\u0900" <= char <= "\u097f" for char in text):
+        # Distinguish Hindi from Marathi based on common words
+        if any(word in text for word in ["आहे", "नमस्कार", "काय", "कसे"]):
+            return "mr"  # Marathi
+        return "hi"  # Hindi
 
-    lower_text = text.lower()
+    # Check for Marwari (also uses Devanagari but with specific words)
+    if any(word in text for word in ["थारो", "म्हारो", "राम", "राम"]):
+        return "mwr"
 
-    if any(keyword in lower_text for keyword in hindi_keywords):
-        return {
-            "detected_language": "hi",
-            "processed_text": text,
-            "confidence": 0.8,
-            "translation_needed": True,
-        }
-    if any(keyword in lower_text for keyword in marathi_keywords):
-        return {
-            "detected_language": "mr",
-            "processed_text": text,
-            "translation_needed": True,
-            "confidence": 0.8,
-        }
+    return "en"  # Default to English
 
-    # Default to English
+
+@router.get("/suggested-questions")
+async def get_suggested_questions():
+    """Get suggested questions for better UX"""
     return {
-        "detected_language": "en",
-        "processed_text": text,
-        "confidence": 1.0,
-        "translation_needed": False,
+        "en": [
+            "What is the admission process?",
+            "How much are the fees?",
+            "Tell me about scholarships",
+            "What courses do you offer?",
+            "How can I apply for hostel?",
+        ],
+        "hi": [
+            "प्रवेश प्रक्रिया क्या है?",
+            "फीस कितनी है?",
+            "छात्रवृत्ति के बारे में बताएं",
+            "कौन से कोर्स उपलब्ध हैं?",
+            "हॉस्टल के लिए कैसे आवेदन करें?",
+        ],
+        "mr": [
+            "प्रवेश प्रक्रिया काय आहे?",
+            "फी किती आहे?",
+            "शिष्यवृत्तीबद्दल सांगा",
+            "कोणते अभ्यासक्रम उपलब्ध आहेत?",
+            "वसतिगृहासाठी कसा अर्ज करावा?",
+        ],
+        "mwr": [
+            "दाखिला प्रक्रिया क्या है?",
+            "फीस कितनी है?",
+            "छात्रवृत्ति के बारे में बताओ",
+            "कौनसे कोर्स मिलेंगे?",
+            "हॉस्टल में कैसे आवेदन करें?",
+        ],
     }
-
-
-async def translate_text(
-    text: str, source_lang: str, target_lang: str
-) -> Dict[str, Any]:
-    """Translate text between languages."""
-    if source_lang == target_lang:
-        return {"translated_text": text, "confidence": 1.0}
-
-    return {
-        "translated_text": f"Translated to {target_lang}: {text}",
-        "confidence": 0.9,
-    }
-
-
-async def get_nlu_intent_and_entities(text: str, language: str) -> Dict[str, Any]:
-    """Get intent and entities from Rasa NLU."""
-    RASA_API_URL = settings.RASA_API_URL or "http://localhost:5005"
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{RASA_API_URL}/model/parse",
-                json={"text": text, "language": language},
-                timeout=10.0,
-            )
-
-            if response.status_code != 200:
-                return {"intent": "general_query", "entities": []}
-
-            data = response.json()
-
-            # Extract the most confident intent
-            best_intent = "general_query"
-            max_confidence = 0
-
-            if data.get("intent") and data["intent"].get("name"):
-                best_intent = data["intent"]["name"]
-                max_confidence = data["intent"]["confidence"]
-
-            # If confidence is too low, fallback to general query
-            if max_confidence < 0.5:
-                best_intent = "general_query"
-
-            return {"intent": best_intent, "entities": data.get("entities", [])}
-    except Exception as e:
-        print(f"Error calling Rasa NLU: {e}")
-        return {"intent": "general_query", "entities": []}
-
-
-async def retrieve_context_documents(
-    query: str, language: str = "en", top_k: int = 5
-) -> Dict[str, Any]:
-    """Retrieve context documents using RAG."""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{settings.BACKEND_URL}/api/v1/documents/search",
-                json={"query": query, "language": language, "top_k": top_k},
-                timeout=10.0,
-            )
-
-            if response.status_code != 200:
-                return {"retrieved_chunks": [], "sources": []}
-
-            data = response.json()
-            return {
-                "retrieved_chunks": data.get("chunks", []),
-                "sources": data.get("sources", []),
-            }
-    except Exception as e:
-        print(f"Error retrieving context documents: {e}")
-        return {"retrieved_chunks": [], "sources": []}
-
-
-async def generate_static_response(intent: str, lang: str) -> ChatResponse:
-    """Generate static responses for specific intents."""
-    reply = ""
-    action = intent
-
-    if intent == "request_human_handoff":
-        reply = "I've escalated your query to a human assistant. Your request ID is: REQ-1234. A staff member will join this chat shortly."
-        action = "handoff"
-    elif intent == "out_of_scope":
-        reply = "I can only help with college-related topics like admissions, fees, and timetables. Please ask something within my scope."
-        action = "out_of_scope"
-    else:
-        # Default fallback for unhandled intents
-        reply = "I'm sorry, I didn't understand that. Could you please rephrase?"
-        action = "general_fallback"
-
-    # Basic translation simulation for static responses if not English
-    if lang != "en":
-        translation_result = await translate_text(reply, "en", lang)
-        if translation_result["confidence"] > 0.5:
-            reply = translation_result["translated_text"]
-
-    return ChatResponse(
-        reply=reply,
-        confidence=1.0,  # High confidence for static, predefined responses
-        source_ids=[],
-        action=action,
-        translated=lang != "en",
-        original_language=lang,
-    )
 
 
 @router.post("/text", response_model=ChatResponse)
@@ -208,76 +124,97 @@ async def chat_text(
     rag_service: RAGService = Depends(get_rag_service),
     translation_service: TranslationService = Depends(get_translation_service),
 ):
-    """Process text chat requests with full orchestration."""
+    """
+    Process text chat requests.
+
+    NEW APPROACH:
+    - Detect language from user query
+    - Use RAG to find relevant context (in English documents)
+    - Pass EVERYTHING to Gemini with instruction to respond in user's language
+    - Gemini handles understanding + multilingual response generation
+    """
     try:
-        # Check cache first
-        cache_key = f"chat:{hashlib.sha256(request.message.encode()).hexdigest()}"
-        cached_response = cache_get(cache_key)
-        if cached_response:
-            return ChatResponse(**json.loads(cached_response))
+        user_message = request.message.strip()
 
-        # Use the new translation service for language detection and translation
+        # Detect user's language
+        detected_lang = detect_language(user_message)
+
+        logger.info(f"User message: {user_message[:50]}... (lang: {detected_lang})")
+
+        # Get relevant documents from RAG (always search in English)
+        # For non-English queries, we translate query for RAG search
         translation_helper = TranslationHelper(translation_service)
-        query_info = translation_helper.process_multilingual_query(request.message)
 
-        english_text = query_info["english_query"]
-        original_language = query_info["detected_language"]
-        needs_translation = query_info["needs_response_translation"]
+        # Translate query to English for RAG search
+        search_query = user_message
+        if detected_lang != "en":
+            # Simple translation for RAG search
+            query_info = translation_helper.process_multilingual_query(user_message)
+            search_query = query_info.get("english_query", user_message)
 
-        # Get intent and entities from Rasa NLU (skip in demo mode)
-        intent = "general_query"
-        entities = []
-        if not settings.DEMO_MODE:
-            nlu_result = await get_nlu_intent_and_entities(english_text, "en")
-            intent = nlu_result["intent"]
-            entities = nlu_result["entities"]
+        # Search for relevant documents
+        rag_results = rag_service.search(
+            query=search_query,
+            top_k=3,  # Limit to top 3 for better token efficiency
+            score_threshold=0.3,
+        )
 
-        response: ChatResponse
+        # Prepare context from RAG
+        context_docs = []
+        source_ids = []
+        if rag_results:
+            context_docs = [r["text"] for r in rag_results]
+            source_ids = list(set(r["doc_id"] for r in rag_results))
+            logger.info(f"Found {len(context_docs)} relevant documents")
 
-        # Handle specific intents that don't require LLM/RAG
-        if intent in ["out_of_scope", "request_human_handoff"]:
-            response = await generate_static_response(intent, original_language)
-        else:
-            # RAG Retrieval - now works in both demo and production modes
-            context = []
-            source_ids = []
+        # Build enhanced prompt for Gemini with multilingual instructions
+        language_names = {
+            "en": "English",
+            "hi": "Hindi",
+            "mr": "Marathi",
+            "mwr": "Marwari",
+        }
 
-            # Use the RAG service to get relevant context
-            rag_results = rag_service.search(
-                query=english_text, top_k=5, score_threshold=0.3
-            )
+        response_language = language_names.get(detected_lang, "English")
 
-            if rag_results:
-                context = [r["text"] for r in rag_results]
-                source_ids = list(set(r["doc_id"] for r in rag_results))
+        # Create multilingual-aware prompt
+        enhanced_prompt = f"""User Question (in {response_language}): {user_message}
 
-            # Generate response using LLM with RAG context
-            llm_response = llm_service.generate_response(english_text, context)
+IMPORTANT INSTRUCTIONS:
+1. The user asked their question in {response_language}
+2. You MUST respond in {response_language} (the same language as the question)
+3. Use the context below to provide accurate information
+4. Keep your answer concise (under 150 words)
+5. Be helpful and friendly
 
-            # Translate response back to original language if needed
-            final_response = llm_response
-            if needs_translation:
-                translated, _ = translation_helper.translate_response_to_original(
-                    llm_response, original_language
-                )
-                final_response = translated
+Context from our knowledge base:
+{chr(10).join(context_docs) if context_docs else "No specific documents found. Use your general knowledge about college admissions and education."}
 
-            response = ChatResponse(
-                reply=final_response,
-                source_ids=source_ids,
-                action="answer:llm" if context else "answer:llm_no_context",
-                translated=needs_translation,
-                original_language=original_language,
-                confidence=query_info["confidence"] if context else 0.5,
-            )
+Respond in {response_language}:"""
 
-        # Cache the response
-        cache_set(cache_key, json.dumps(response.model_dump()))
+        # Generate response using Gemini
+        llm_response = llm_service.generate_response(
+            prompt=enhanced_prompt, context=context_docs if context_docs else None
+        )
+
+        logger.info(f"Generated response (first 100 chars): {llm_response[:100]}...")
+
+        response = ChatResponse(
+            reply=llm_response,
+            source_ids=source_ids,
+            action="answer:gemini",
+            translated=False,  # Gemini generates directly in target language
+            original_language=detected_lang,
+            confidence=0.9 if context_docs else 0.7,
+        )
 
         return response
+
     except Exception as e:
+        logger.error(f"Chat processing error: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Error processing chat request: {str(e)}"
+            status_code=500,
+            detail="Unable to process your request. Please try again later.",
         )
 
 
@@ -298,8 +235,10 @@ async def chat_voice(
         request = ChatRequest(message=transcribed_text)
         return await chat_text(request, llm_service, rag_service, translation_service)
     except Exception as e:
+        logger.error(f"Voice processing error: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Error processing voice request: {str(e)}"
+            status_code=500,
+            detail="Unable to process voice request. Please try again later.",
         )
 
 
@@ -311,32 +250,23 @@ async def transcribe_audio(
 ):
     """
     Transcribe audio to text without generating a chat response.
-
-    This endpoint is used for voice input functionality where the user
-    wants to convert speech to text before sending as a message.
     """
     try:
-        # Read audio data
         audio_data = await audio_file.read()
+        transcribed_text = stt_service.transcribe_audio(audio_data)
 
-        # Transcribe using STT service
-        transcribed_text = stt_service.transcribe_audio(audio_data, language=language)
-
-        # Get audio duration (if available)
-        duration = len(audio_data) / (
-            16000 * 2
-        )  # Rough estimate for 16kHz 16-bit audio
+        duration = len(audio_data) / (16000 * 2)  # Rough estimate
 
         return JSONResponse(
             content={
                 "text": transcribed_text,
                 "language": language,
-                "confidence": 0.9,  # STT service should provide this
+                "confidence": 0.9,
                 "duration": round(duration, 2),
             }
         )
-
     except Exception as e:
+        logger.error(f"Transcription error: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Error transcribing audio: {str(e)}"
+            status_code=500, detail="Unable to transcribe audio. Please try again."
         )

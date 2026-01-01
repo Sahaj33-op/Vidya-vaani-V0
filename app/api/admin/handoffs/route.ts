@@ -1,43 +1,38 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { redis } from "@/lib/redis-helpers"
-import { requireAuth } from "@/lib/auth"
-import { mockDataStore } from "@/lib/mock-data-store"
+import { type NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
-  const authResult = await requireAuth(request)
-  if (authResult instanceof NextResponse) return authResult
+  const authResult = await requireAuth(request);
+  if (authResult instanceof NextResponse) return authResult;
 
   try {
-    // Development mode: use mock data store
-    if (process.env.NEXT_PUBLIC_DEV_MODE === 'true') {
-      console.log('[v0] Dev mode: using mock data store for handoffs')
-      const requests = mockDataStore.getAllHandoffs()
-      return NextResponse.json({ requests })
+    const backendUrl =
+      process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+    // Fetch handoffs from backend
+    try {
+      const response = await fetch(`${backendUrl}/api/v1/handoffs/list`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const backendData = await response.json();
+        return NextResponse.json({ requests: backendData.handoffs || [] });
+      }
+    } catch (backendError) {
+      console.error("[v0] Backend handoffs unavailable:", backendError);
     }
 
-    // Production mode: use Redis
-    if (!redis) {
-      console.error("[v0] Redis client not initialized.")
-      return NextResponse.json({ error: "Internal server error: Redis not available" }, { status: 500 })
-    }
-
-    const redisClient = redis // Ensure redis is not null for type narrowing
-
-    // Get real handoff requests from Redis/database
-    const handoffKeys = await redisClient.keys("handoff:*")
-    const requests = await Promise.all(
-      handoffKeys.map(async (key) => {
-        const handoff = await redisClient.get(key)
-        if (typeof handoff === "string") {
-          return JSON.parse(handoff)
-        }
-        return null // Handle non-string or null handoffs
-      })
-    )
-
-    return NextResponse.json({ requests: requests.filter(Boolean) })
+    // Fallback to empty list
+    return NextResponse.json({ requests: [] });
   } catch (error) {
-    console.error("[v0] Admin handoffs API error:", error)
-    return NextResponse.json({ error: "Failed to fetch handoff requests" }, { status: 500 })
+    console.error("[v0] Admin handoffs API error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch handoff requests" },
+      { status: 500 },
+    );
   }
 }
